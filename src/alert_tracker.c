@@ -47,10 +47,25 @@ void alert_tracker_configure(AlertTracker *at, const RefloatConfig *config) {
 }
 
 void alert_tracker_add(AlertTracker *at, const Time *time, uint8_t id, uint8_t code) {
-    uint32_t mask = alert_id_to_mask(ALERT_FW_FAULT);
+    if (id <= ALERT_NONE || id > ALERT_LAST) {
+        return;
+    }
+
+    uint32_t mask = alert_id_to_mask(id);
     bool already_active = at->active_alert_mask & mask;
     if (id == ALERT_FW_FAULT) {
-        already_active = already_active && code == at->fw_fault_code;
+        if (already_active && code != at->fw_fault_code) {
+            AlertRecord ended = {
+                .time = time->now,
+                .id = id,
+                .code = at->fw_fault_code,
+                .active = false,
+            };
+            circular_buffer_push(&at->alert_buffer, &ended);
+        }
+        // The first/repeated/different-code outcomes are covered; gcov adds a boolean-normalization
+        // edge.
+        already_active = already_active && code == at->fw_fault_code;  // GCOVR_EXCL_BR_LINE
         at->fw_fault_code = code;
     }
 
@@ -59,7 +74,8 @@ void alert_tracker_add(AlertTracker *at, const Time *time, uint8_t id, uint8_t c
         circular_buffer_push(&at->alert_buffer, &alert);
     }
 
-    if (alert_tracker_properties(id)->type == ATYPE_FATAL) {
+    if (alert_tracker_properties(id)->type ==
+        ATYPE_FATAL) {  // GCOVR_EXCL_BR_LINE: every current AlertId is fatal.
         at->fatal_error = true;
     }
 
@@ -72,14 +88,18 @@ void alert_tracker_finalize(AlertTracker *at, const Time *time) {
     for (uint8_t id = 1; id <= ALERT_LAST; ++id) {
         uint32_t mask = alert_id_to_mask(id);
         if (at->active_alert_mask & mask && !(at->new_active_alert_mask & mask)) {
-            AlertRecord alert = {.time = time->now, .id = id, .code = 0, .active = false};
+            uint8_t code = id == ALERT_FW_FAULT ? at->fw_fault_code
+                                                : 0;  // GCOVR_EXCL_BR_LINE: it is the only AlertId.
+            AlertRecord alert = {.time = time->now, .id = id, .code = code, .active = false};
             circular_buffer_push(&at->alert_buffer, &alert);
-            if (id == ALERT_FW_FAULT) {
+            if (id == ALERT_FW_FAULT) {  // GCOVR_EXCL_BR_LINE: it is the only AlertId.
                 at->fw_fault_code = 0;
             }
         }
 
-        if (at->active_alert_mask & mask && alert_tracker_properties(id)->type == ATYPE_FATAL) {
+        if (at->new_active_alert_mask & mask &&
+            alert_tracker_properties(id)->type ==
+                ATYPE_FATAL) {  // GCOVR_EXCL_BR_LINE: every current AlertId is fatal.
             clear_fatal = false;
         }
     }

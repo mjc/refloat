@@ -20,6 +20,8 @@
 #include "lib/utils.h"
 #include "vesc_c_if.h"
 
+#include <string.h>
+
 static void start_recording(DataRecord *dr) {
     circular_buffer_clear(&dr->buffer);
     dr->decimation_counter = 0;
@@ -46,40 +48,48 @@ void data_recorder_init(DataRecord *dr, uint16_t imu_sample_rate) {
 
     // fetch information about the data buffer, it's stored at the end of the
     // VESC interface memory area
-    DataBufferInfo *buffer_info = (DataBufferInfo *) ((uint8_t *) VESC_IF + 2036);
+    DataBufferInfo buffer_info;
+    memcpy(&buffer_info, (uint8_t *) VESC_IF + 2036, sizeof(buffer_info));
 
     // Magic format: 0xcafe1XVM where X=ignored (reserved for future use),
     // V=major version (4 bits), M=minor version (4 bits)
     // we check that the base magic matches and the version is compatible
-    const uint32_t magic_base = buffer_info->magic & 0xfffff000;
-    const uint8_t magic_major = (buffer_info->magic >> 4) & 0x0f;
-    const uint8_t magic_minor = buffer_info->magic & 0x0f;
+    const uint32_t magic_base = buffer_info.magic & 0xfffff000;
+    const uint8_t magic_major = (buffer_info.magic >> 4) & 0x0f;
+    const uint8_t magic_minor = buffer_info.magic & 0x0f;
     const uint8_t required_major = 1;
     const uint8_t required_minor = 1;
     if (magic_base != 0xcafe1000 || magic_major != required_major || magic_minor < required_minor) {
-        if (buffer_info->magic != 0) {
-            log_msg("Data Record incompatible magic: 0x%08x", buffer_info->magic);
+        if (buffer_info.magic != 0) {
+            log_msg("Data Record incompatible magic: 0x%08x", buffer_info.magic);
         }
         dr->enabled = false;
         return;
     }
 
     dr->enabled = true;
-    size_t size = buffer_info->length;
+    size_t size = buffer_info.length;
     dr->sample_count = size / sizeof(Sample);
-    uint8_t *buffer = buffer_info->buffer;
+    if (dr->sample_count == 0) {
+        dr->enabled = false;
+        return;
+    }
+    uint8_t *buffer = buffer_info.buffer;
     circular_buffer_init(&dr->buffer, sizeof(Sample), dr->sample_count, buffer);
 
     dr->sample_rate = imu_sample_rate;
 
     // calculate decimation so that the recorded time period is at least 10 seconds
-    dr->decimation = max(10 * imu_sample_rate / dr->sample_count, 1);
+    dr->decimation = min(max(10u * imu_sample_rate / dr->sample_count, 1u), 255u);
 
     log_msg("Data Record buffer size: %uB (%u samples)", size, dr->sample_count);
 }
 
 void data_recorder_set_sample_rate(DataRecord *dr, uint16_t sample_rate) {
     dr->sample_rate = sample_rate;
+    if (dr->sample_count > 0) {
+        dr->decimation = min(max(10u * sample_rate / dr->sample_count, 1u), 255u);
+    }
 }
 
 bool data_recorder_has_capability(const DataRecord *dr) {
@@ -136,7 +146,9 @@ static void send_point_vt_experiment(const void *item, void *data) {
     Sample *sample = (Sample *) item;
     for (uint8_t i = 0; i < ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS); ++i) {
         VESC_IF->plot_set_graph(i);
-        VESC_IF->plot_send_points(sample->time, sample->values[i]);
+        VESC_IF->plot_send_points(
+            sample->time * (1.0f / SYSTEM_TICK_RATE_HZ), from_float16(sample->values[i])
+        );
     }
 }
 
@@ -145,6 +157,8 @@ void data_recorder_send_experiment_plot(DataRecord *dr) {
         return;
     }
 
+    bool recording = dr->recording;
+    stop_recording(dr);
     VESC_IF->plot_init("t", "v");
 
 #define ADD_GRAPH(target, id) VESC_IF->plot_add_graph(id);
@@ -152,6 +166,7 @@ void data_recorder_send_experiment_plot(DataRecord *dr) {
 #undef ADD_GRAPH
 
     circular_buffer_iterate(&dr->buffer, &send_point_vt_experiment, 0);
+    dr->recording = recording;
 }
 
 typedef enum {
@@ -169,7 +184,8 @@ static void send_status(const DataRecord *dr) {
     buf[ind++] = dr->enabled;
     buf[ind++] = dr->autostop << 2 | dr->autostart << 1 | dr->recording;
     buf[ind++] = dr->decimation;
-    uint32_t centiseconds = (uint32_t) dr->sample_count * 100 / dr->sample_rate;
+    uint32_t centiseconds =
+        dr->sample_rate == 0 ? 0 : (uint32_t) dr->sample_count * 100 / dr->sample_rate;
     buffer_append_uint16(buf, min(centiseconds, 65535u), &ind);
 
     SEND_APP_DATA(buf, 7, ind);
@@ -194,10 +210,6 @@ static void send_header(DataRecord *dr) {
 }
 
 static void send_data(const DataRecord *dr, size_t offset) {
-    if (!dr->enabled || circular_buffer_size(&dr->buffer) == 0) {
-        return;
-    }
-
     static const int bufsize = SEND_BUF_MAX_SIZE;
     uint8_t buf[bufsize];
     int32_t ind = 0;
@@ -208,17 +220,17 @@ static void send_data(const DataRecord *dr, size_t offset) {
     buffer_append_uint32(buf, offset, &ind);
 
     Sample sample;
+    const size_t sample_size = 4u + 1u + 2u * ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS);
     while (circular_buffer_get(&dr->buffer, offset++, &sample)) {
+        if ((size_t) ind + sample_size > (size_t) bufsize) {
+            break;
+        }
+
         buffer_append_uint32(buf, sample.time, &ind);
         buf[ind++] = sample.flags;
 
         for (size_t i = 0; i < ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS); ++i) {
             buffer_append_uint16(buf, sample.values[i], &ind);
-        }
-
-        // 4 bytes for time, 1 byte for flags, 2 bytes for rest of the values
-        if (ind + 4 + 1 + 2 * ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS) > bufsize) {
-            break;
         }
     }
 
@@ -226,13 +238,17 @@ static void send_data(const DataRecord *dr, size_t offset) {
 }
 
 void data_recorder_request(DataRecord *dr, uint8_t *buffer, size_t len) {
-    if (!dr->enabled) {
-        log_error("Data Record not supported.");
+    if (len < 2) {
+        log_error("Data Record request missing data.");
         return;
     }
 
-    if (len < 2) {
-        log_error("Data Record request missing data.");
+    if (!dr->enabled) {
+        if (buffer[0] == 1 && buffer[1] == 0) {
+            send_status(dr);
+        } else {
+            log_error("Data Record not supported.");
+        }
         return;
     }
 
@@ -275,6 +291,7 @@ void data_recorder_request(DataRecord *dr, uint8_t *buffer, size_t len) {
             }
 
             size_t offset = buffer_get_uint32(buffer, &ind);
+            stop_recording(dr);
             send_data(dr, offset);
         }
     }

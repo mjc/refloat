@@ -18,6 +18,8 @@
 
 #include "bms.h"
 
+#include "lib/utils.h"
+
 #include <math.h>
 
 void bms_init(BMS *bms) {
@@ -42,39 +44,48 @@ void bms_update(BMS *bms, const CfgBMS *cfg, const Time *time) {
 
     uint32_t fault_mask = BMSF_NONE;
     const float timeout = 5.0f;
+    // Custom config packets bypass the VESC Tool UI's field bounds.
+    const float cell_lv_threshold = fmaxf(cfg->cell_lv_threshold, 2.5f);
+    const float cell_hv_threshold = clampf(cfg->cell_hv_threshold, 2.5f, 4.5f);
+    const float cell_balance_threshold = clampf(cfg->cell_balance_threshold, 0.01f, 1.0f);
+    const int16_t cell_ht_threshold = cfg->cell_ht_threshold > 60 ? 60 : cfg->cell_ht_threshold;
+    const int16_t cell_lt_threshold = (int16_t) clampf(cfg->cell_lt_threshold, -20.0f, 20.0f);
+    const int16_t bms_ht_threshold = cfg->bms_ht_threshold > 80 ? 80 : cfg->bms_ht_threshold;
 
     // Before the first BMS update occurs right after startup, msg_age has its
     // init value. We need to wait the `timeout` time before issuing errors.
-    if (bms->msg_age > timeout && time_elapsed(time, start, timeout)) {
-        set_fault(&fault_mask, BMSF_CONNECTION);
+    if (bms->msg_age > timeout) {
+        if (time_elapsed(time, start, timeout)) {
+            set_fault(&fault_mask, BMSF_CONNECTION);
+        }
         bms->fault_mask = fault_mask;
         return;
     }
 
-    if (bms->cell_lv < cfg->cell_lv_threshold) {
+    if (bms->cell_lv < cell_lv_threshold) {
         set_fault(&fault_mask, BMSF_CELL_UNDER_VOLTAGE);
     }
 
-    if (bms->cell_hv > cfg->cell_hv_threshold) {
+    if (bms->cell_hv > cell_hv_threshold) {
         set_fault(&fault_mask, BMSF_CELL_OVER_VOLTAGE);
     }
 
     // Setting high temp threshold to 0 disables both high and low temp checking
-    if (cfg->cell_ht_threshold > 0) {
-        if (bms->cell_ht > cfg->cell_ht_threshold) {
+    if (cell_ht_threshold > 0) {
+        if (bms->cell_ht > cell_ht_threshold) {
             set_fault(&fault_mask, BMSF_CELL_OVER_TEMP);
         }
 
-        if (bms->cell_lt < cfg->cell_lt_threshold) {
+        if (bms->cell_lt < cell_lt_threshold) {
             set_fault(&fault_mask, BMSF_CELL_UNDER_TEMP);
         }
     }
 
-    if (cfg->bms_ht_threshold > 0 && bms->bms_ht > cfg->bms_ht_threshold) {
+    if (bms_ht_threshold > 0 && bms->bms_ht > bms_ht_threshold) {
         set_fault(&fault_mask, BMSF_OVER_TEMP);
     }
 
-    if (fabsf(bms->cell_lv - bms->cell_hv) > cfg->cell_balance_threshold) {
+    if (fabsf(bms->cell_lv - bms->cell_hv) > cell_balance_threshold) {
         set_fault(&fault_mask, BMSF_CELL_BALANCE);
     }
 
@@ -82,5 +93,8 @@ void bms_update(BMS *bms, const CfgBMS *cfg, const Time *time) {
 }
 
 bool bms_is_fault(const BMS *bms, BMSFaultCode fault_code) {
+    if (fault_code < BMSF_CONNECTION || fault_code > BMSF_CELL_BALANCE) {
+        return false;
+    }
     return (bms->fault_mask & (1u << (fault_code - 1))) != 0;
 }
