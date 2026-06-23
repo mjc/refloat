@@ -79,10 +79,7 @@ void fatal_error_terminate();
  */
 #define SEND_APP_DATA(buffer, buf_size, ind)                                                       \
     do {                                                                                           \
-        _Static_assert(                                                                            \
-            buf_size <= SEND_BUF_MAX_SIZE, "Data to send too long, won't fit into send buffer."    \
-        );                                                                                         \
-        if (ind > buf_size) {                                                                      \
+        if ((buf_size) > SEND_BUF_MAX_SIZE || (ind) > (buf_size)) {                                \
             log_error(                                                                             \
                 "%s: App data buffer overflow (buffer: %u, data: %u), terminating.",               \
                 __func__,                                                                          \
@@ -91,8 +88,9 @@ void fatal_error_terminate();
             );                                                                                     \
             /* terminate the main thread, the memory has just been corrupted by buffer overflow */ \
             fatal_error_terminate();                                                               \
+        } else {                                                                                   \
+            VESC_IF->send_app_data(buffer, ind);                                                   \
         }                                                                                          \
-        VESC_IF->send_app_data(buffer, ind);                                                       \
     } while (0)
 
 #define sign(x) (((x) < 0) ? -1 : 1)

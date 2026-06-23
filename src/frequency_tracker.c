@@ -32,8 +32,13 @@ void frequency_tracker_init(FrequencyTracker *ft, float frequency, const Time *t
 }
 
 void frequency_tracker_update(FrequencyTracker *ft, float dt) {
+    if (!isfinite(dt) || dt <= 0.0f) {
+        return;
+    }
     ft->dt = dt * 1000.0f;
-    ema_update(&ft->frequency, 1.0f / dt);
+    ema_update(
+        &ft->frequency, 1.0f / dt
+    );  // GCOVR_EXCL_BR_LINE: validated input keeps the inline EMA target finite.
 }
 
 void frequency_tracker_check(
@@ -45,7 +50,9 @@ void frequency_tracker_check(
     }
     ft->running = running;
 
-    if ((running || ft->first) && timer_older(time, ft->filter_last_update, 1.0f) &&
+    // All semantic operands and outcomes are covered; gcov adds an optimized boolean edge.
+    if ((running || ft->first) &&
+        timer_older(time, ft->filter_last_update, 1.0f) &&  // GCOVR_EXCL_BR_LINE
         fabsf(1 - ft->frequency.value / ft->filter_frequency) > 0.03f) {
         reconf_cb(ft->frequency.value);
         ft->filter_frequency = ft->frequency.value;

@@ -44,6 +44,11 @@ void sma_destroy(SMA *sma) {
 }
 
 void sma_configure(SMA *sma, float cutoff_freq, float update_freq) {
+    if (!isfinite(cutoff_freq) || cutoff_freq <= 0.0f || !isfinite(update_freq) ||
+        update_freq <= 0.0f) {
+        return;
+    }
+
     uint8_t n = min(sma_calculate_n(cutoff_freq, update_freq), 255);
     if (sma->array == 0) {
         // Allocate with a 20% leeway to be able to increase the n later if needed
@@ -55,8 +60,8 @@ void sma_configure(SMA *sma, float cutoff_freq, float update_freq) {
             return;
         }
 
-        sma_reset(sma);
         sma->n = n;
+        sma_reset(sma);
     } else if ((n = min(n, sma->allocated_n)) != sma->n && sma->new_n == 0) {
         sma->new_n = n;
     }
@@ -72,6 +77,9 @@ void sma_reset(SMA *sma) {
 }
 
 void sma_update(SMA *sma, float target) {
+    if (!sma->array || !isfinite(target)) {
+        return;
+    }
     sma->value += (target - sma->array[sma->idx]) / sma->n;
     sma->array[sma->idx] = target;
 
@@ -86,7 +94,8 @@ void sma_update(SMA *sma, float target) {
             }
             sma->value -= subt / sma->n;
             sma->value *= (float) sma->n / sma->new_n;
-        } else if (sma->new_n > sma->n) {
+        } else {
+            // A pending size always differs from n, so the only remaining case is growth.
             for (uint8_t i = sma->n; i < sma->new_n; ++i) {
                 sma->array[i] = sma->value;
             }

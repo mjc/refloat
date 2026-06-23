@@ -19,8 +19,6 @@
 
 #include "lib/utils.h"
 
-#include <math.h>
-
 void pid_init(PID *pid) {
     ema_init(&pid->p_fwd_scale);
     ema_init(&pid->rate_p_fwd_scale);
@@ -56,30 +54,40 @@ void pid_update(
     const RefloatConfig *config,
     float dt
 ) {
+    if (dt <= 0.0f) {
+        pid->p = 0.0f;
+        pid->rate_p = 0.0f;
+        return;
+    }
+
     float error = setpoint - imu->balance_pitch;
 
-    pid->p = error * config->kp * TORQUE_CONSTANT_COMPAT;
+    // XML imports and COMM_SET_CUSTOM_CONFIG over BTLE bypass VESC Tool's
+    // editor bounds. Keep P, I, rate-P, I windup, and both brake scales in
+    // their declared control domains before they affect requested current.
+    pid->p = error * clampf(config->kp, 0.0f, 40.0f) * TORQUE_CONSTANT_COMPAT;
 
-    pid->i = pid->i + error * config->ki * TORQUE_CONSTANT_COMPAT * LOOP_HERTZ_COMPAT * dt;
-    float ki_limit = config->ki_limit * TORQUE_CONSTANT_COMPAT;
+    pid->i = pid->i +
+        error * clampf(config->ki, 0.0f, 0.5f) * TORQUE_CONSTANT_COMPAT * LOOP_HERTZ_COMPAT * dt;
+    float ki_limit = clampf(config->ki_limit, 0.0f, 500.0f) * TORQUE_CONSTANT_COMPAT;
     if (ki_limit > 0 && fabsf(pid->i) > ki_limit) {
         pid->i = ki_limit * sign(pid->i);
     }
 
-    pid->rate_p = -imu->pitch_rate * config->kp2 * TORQUE_CONSTANT_COMPAT;
+    pid->rate_p = -imu->pitch_rate * clampf(config->kp2, 0.0f, 3.0f) * TORQUE_CONSTANT_COMPAT;
 
     // brake scale coefficient smoothing
     if (md->erpm < -500) {
-        ema_update(&pid->p_fwd_scale, config->kp_brake);
-        ema_update(&pid->rate_p_fwd_scale, config->kp2_brake);
+        ema_update(&pid->p_fwd_scale, clampf(config->kp_brake, 0.0f, 3.0f));
+        ema_update(&pid->rate_p_fwd_scale, clampf(config->kp2_brake, 0.0f, 3.0f));
     } else {
         ema_update(&pid->p_fwd_scale, 1.0f);
         ema_update(&pid->rate_p_fwd_scale, 1.0f);
     }
 
     if (md->erpm > 500) {
-        ema_update(&pid->p_bwd_scale, config->kp_brake);
-        ema_update(&pid->rate_p_bwd_scale, config->kp2_brake);
+        ema_update(&pid->p_bwd_scale, clampf(config->kp_brake, 0.0f, 3.0f));
+        ema_update(&pid->rate_p_bwd_scale, clampf(config->kp2_brake, 0.0f, 3.0f));
     } else {
         ema_update(&pid->p_bwd_scale, 1.0f);
         ema_update(&pid->rate_p_bwd_scale, 1.0f);

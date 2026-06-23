@@ -24,6 +24,10 @@ uint32_t rnd(uint32_t seed) {
 }
 
 void rate_limitf(float *value, float target, float step) {
+    if (!isfinite(*value) || !isfinite(target) || !isfinite(step) || step <= 0.0f) {
+        return;
+    }
+
     if (fabsf(target - *value) < step) {
         *value = target;
     } else if (target - *value > 0) {

@@ -22,6 +22,11 @@
 #include <math.h>
 
 float ema_calculate_alpha(float cutoff_freq, float update_freq) {
+    if (!isfinite(cutoff_freq) || cutoff_freq <= 0.0f || !isfinite(update_freq) ||
+        update_freq <= 0.0f) {
+        return 0.0f;
+    }
+
     // limit omega to < 0.5, the Taylor series approximation is not accurate
     // over that and equals to alpha = 0.375, which is already not effectively
     // filtering much at all.

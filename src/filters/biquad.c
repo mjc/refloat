@@ -31,6 +31,16 @@ void biquad_init(Biquad *biquad) {
 }
 
 void biquad_configure(Biquad *biquad, BiquadType type, float cutoff_freq, float update_freq) {
+    if ((type != BQ_LOWPASS && type != BQ_HIGHPASS) || !isfinite(cutoff_freq) ||
+        cutoff_freq <= 0.0f || !isfinite(update_freq) || update_freq <= 0.0f) {
+        biquad->a0 = 1.0f;
+        biquad->a1 = 0.0f;
+        biquad->a2 = 0.0f;
+        biquad->b1 = 0.0f;
+        biquad->b2 = 0.0f;
+        return;
+    }
+
     float k = tanf(M_PI * cutoff_freq / update_freq);
     float q = 0.707;  // maximum sharpness (0.5 = maximum smoothness)
     float norm = 1 / (1 + k / q + k * k);
@@ -38,7 +48,8 @@ void biquad_configure(Biquad *biquad, BiquadType type, float cutoff_freq, float 
         biquad->a0 = k * k * norm;
         biquad->a1 = 2 * biquad->a0;
         biquad->a2 = biquad->a0;
-    } else if (type == BQ_HIGHPASS) {
+    } else {
+        // Invalid types returned above, so the only remaining type is high-pass.
         biquad->a0 = 1 * norm;
         biquad->a1 = -2 * biquad->a0;
         biquad->a2 = biquad->a0;
