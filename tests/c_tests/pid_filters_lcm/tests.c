@@ -1,0 +1,409 @@
+static bool test_sma_growth_transition_edges(void) {
+    vesc_if_fake_reset();
+    vesc_if_fake_fill_next_malloc(0x7f);
+
+    SMA sma;
+    sma_init(&sma);
+    sma_configure(&sma, 8.5f, 100.0f);
+    CHECK(sma.array != NULL);
+    CHECK(sma.n == 5);
+    CHECK(sma.allocated_n == 6);
+
+    for (uint8_t i = 0; i < sma.n; ++i) {
+        sma_update(&sma, 10.0f);
+    }
+    CHECK_FLOAT_NEAR(sma.value, 10.0f);
+
+    uint8_t old_n = sma.n;
+    sma_configure(&sma, 7.0f, 100.0f);
+    CHECK(sma.n == old_n);
+    CHECK(sma.new_n == 6);
+
+    for (uint8_t i = 0; i < old_n; ++i) {
+        sma_update(&sma, 10.0f);
+    }
+    CHECK(sma.n == 6);
+    CHECK(sma.new_n == 0);
+    CHECK(sma.idx == old_n);
+    CHECK_FLOAT_NEAR(sma.array[old_n], 10.0f);
+    CHECK_FLOAT_NEAR(sma.value, 10.0f);
+
+    sma_update(&sma, 22.0f);
+    CHECK(sma.idx == 0);
+    CHECK_FLOAT_NEAR(sma.value, 12.0f);
+
+    sma_configure(&sma, 6.0f, 100.0f);
+    CHECK(sma.new_n == 0);
+    CHECK(sma.n == 6);
+
+    sma_destroy(&sma);
+    CHECK(vesc_if_fake_free_calls() == 1);
+
+    return true;
+}
+
+static sigjmp_buf sma_allocation_failure_sigsegv_env;
+
+enum { TEST_SMA_SIGSEGV = 11 };
+
+static void catch_sma_allocation_failure_sigsegv(int signal_number) {
+    unused(signal_number);
+    siglongjmp(sma_allocation_failure_sigsegv_env, 1);
+}
+
+static bool test_sma_allocation_failure_update(void) {
+    vesc_if_fake_reset();
+    vesc_if_fake_fail_next_malloc();
+
+    SMA sma;
+    sma_init(&sma);
+    sma_configure(&sma, 1.0f, 100.0f);
+    CHECK(sma.array == NULL);
+    CHECK_U32(sma.n, 0u);
+
+    SignalHandler previous_handler = signal(TEST_SMA_SIGSEGV, catch_sma_allocation_failure_sigsegv);
+    if (sigsetjmp(sma_allocation_failure_sigsegv_env, 1) != 0) {
+        signal(TEST_SMA_SIGSEGV, previous_handler);
+        return false;
+    }
+
+    sma_update(&sma, 12.0f);
+    signal(TEST_SMA_SIGSEGV, previous_handler);
+
+    CHECK_FLOAT_NEAR(sma.value, 0.0f);
+    CHECK_U32(sma.idx, 0u);
+    CHECK_U32(vesc_if_fake_malloc_calls(), 1u);
+    CHECK_U32(vesc_if_fake_free_calls(), 0u);
+
+    return true;
+}
+
+static bool test_circular_buffer_pop_index(void) {
+    BufferItem storage[3] = {{0}};
+    CircularBuffer cb;
+    circular_buffer_init(&cb, sizeof(BufferItem), 3, storage);
+
+    BufferItem a = {1, 11};
+    BufferItem b = {2, 22};
+    BufferItem c = {3, 33};
+    BufferItem out = {0};
+
+    circular_buffer_push(&cb, &a);
+    circular_buffer_push(&cb, &b);
+    circular_buffer_push(&cb, &c);
+
+    CHECK(circular_buffer_pop(&cb, 1, &out));
+    CHECK(buffer_item_eq(out, b));
+    CHECK(circular_buffer_size(&cb) == 2);
+    CHECK(circular_buffer_get(&cb, 0, &out));
+    CHECK(buffer_item_eq(out, a));
+    CHECK(circular_buffer_get(&cb, 1, &out));
+    CHECK(buffer_item_eq(out, c));
+
+    return true;
+}
+
+static bool test_lcm_light_ctrl_payload_clamps(void) {
+    LcmData lcm = {0};
+    lcm.enabled = true;
+
+    unsigned char short_cfg[] = {11, 22, 33, 44, 55};
+    lcm_light_ctrl_request(&lcm, short_cfg, (int) sizeof(short_cfg));
+    CHECK(lcm.brightness == 11);
+    CHECK(lcm.brightness_idle == 22);
+    CHECK(lcm.status_brightness == 33);
+    CHECK(lcm.payload_size == 2);
+    CHECK(lcm.payload[0] == 44);
+    CHECK(lcm.payload[1] == 55);
+
+    unsigned char max_cfg[3 + MAX_LCM_PAYLOAD_LENGTH];
+    for (size_t i = 0; i < sizeof(max_cfg); ++i) {
+        max_cfg[i] = (unsigned char) i;
+    }
+
+    lcm_light_ctrl_request(&lcm, max_cfg, (int) sizeof(max_cfg));
+    CHECK(lcm.payload_size == MAX_LCM_PAYLOAD_LENGTH);
+    CHECK(lcm.payload[0] == 3);
+    CHECK(lcm.payload[MAX_LCM_PAYLOAD_LENGTH - 1] == (unsigned char) (2 + MAX_LCM_PAYLOAD_LENGTH));
+
+    unsigned char oversized_cfg[3 + MAX_LCM_PAYLOAD_LENGTH + 5];
+    for (size_t i = 0; i < sizeof(oversized_cfg); ++i) {
+        oversized_cfg[i] = (unsigned char) (200 + i);
+    }
+
+    lcm_light_ctrl_request(&lcm, oversized_cfg, (int) sizeof(oversized_cfg));
+    CHECK(lcm.payload_size == MAX_LCM_PAYLOAD_LENGTH);
+    CHECK(lcm.payload[0] == 203);
+    CHECK(lcm.payload[MAX_LCM_PAYLOAD_LENGTH - 1] == (unsigned char) (202 + MAX_LCM_PAYLOAD_LENGTH));
+
+    return true;
+}
+
+static bool test_lcm_disabled_responses_are_minimal(void) {
+    vesc_if_fake_reset();
+
+    LcmData lcm = {0};
+    lcm.enabled = false;
+    lcm.brightness = 12;
+    lcm.brightness_idle = 34;
+    lcm.status_brightness = 56;
+    lcm.payload_size = 2;
+    lcm.payload[0] = 77;
+    lcm.payload[1] = 88;
+    memcpy(lcm.name, "External", 9);
+
+    uint8_t request[] = {'N', 'e', 'w', '\0'};
+    lcm_poll_request(&lcm, request, sizeof(request));
+    CHECK(strcmp(lcm.name, "External") == 0);
+
+    unsigned char ctrl[] = {1, 2, 3, 4, 5, 6};
+    lcm_light_ctrl_request(&lcm, ctrl, (int) sizeof(ctrl));
+    CHECK_U32(lcm.brightness, 12u);
+    CHECK_U32(lcm.payload_size, 2u);
+
+    State state = {.state = STATE_RUNNING};
+    MotorData motor = {0};
+    lcm_poll_response(&lcm, &state, FS_BOTH, &motor, 45.0f);
+    size_t len = 0;
+    const uint8_t *payload = vesc_if_fake_last_app_data(&len);
+    CHECK(payload != NULL);
+    CHECK_U32(len, 2u);
+    CHECK_U32(payload[0], 101u);
+    CHECK_U32(payload[1], COMMAND_LCM_POLL);
+    CHECK_U32(lcm.payload_size, 2u);
+
+    lcm_light_info_response(&lcm);
+    payload = vesc_if_fake_last_app_data(&len);
+    CHECK(payload != NULL);
+    CHECK_U32(len, 3u);
+    CHECK_U32(payload[1], COMMAND_LCM_LIGHT_INFO);
+    CHECK_U32(payload[2], 0u);
+
+    lcm_device_info_response(&lcm);
+    payload = vesc_if_fake_last_app_data(&len);
+    CHECK(payload != NULL);
+    CHECK_U32(len, 2u);
+    CHECK_U32(payload[1], COMMAND_LCM_DEVICE_INFO);
+
+    lcm_get_battery_response(&lcm);
+    payload = vesc_if_fake_last_app_data(&len);
+    CHECK(payload != NULL);
+    CHECK_U32(len, 2u);
+    CHECK_U32(payload[1], COMMAND_LCM_GET_BATTERY);
+
+    return true;
+}
+
+static bool test_lcm_init_configure_and_runtime_brightness(void) {
+    CfgHwLeds hw = {0};
+    LcmData lcm = {0};
+
+    hw.mode = LED_MODE_INTERNAL;
+    lcm_init(&lcm, &hw);
+    CHECK(!lcm.enabled);
+    CHECK_U32(lcm.brightness, 0u);
+    CHECK_U32(lcm.brightness_idle, 0u);
+    CHECK_U32(lcm.status_brightness, 0u);
+    CHECK(lcm.lights_off_when_lifted);
+    CHECK(lcm.name[0] == '\0');
+
+    hw.mode = LED_MODE_EXTERNAL;
+    lcm_init(&lcm, &hw);
+    CHECK(lcm.enabled);
+
+    CfgLeds cfg = {0};
+    cfg.headlights.brightness = 0.82f;
+    cfg.front.brightness = 0.37f;
+    cfg.status.brightness_headlights_on = 0.41f;
+    cfg.status.brightness_headlights_off = 0.19f;
+    cfg.lights_off_when_lifted = false;
+
+    Leds leds;
+    memset(&leds, 0, sizeof(leds));
+    leds.cfg = &cfg;
+    lcm_fakes_set_runtime_status(true, true);
+    lcm_configure(&lcm, &leds);
+    CHECK_U32(lcm.brightness, 82u);
+    CHECK_U32(lcm.brightness_idle, 37u);
+    CHECK_U32(lcm.status_brightness, 41u);
+    CHECK(!lcm.lights_off_when_lifted);
+
+    lcm_fakes_set_runtime_status(true, false);
+    lcm_configure(&lcm, &leds);
+    CHECK_U32(lcm.brightness, 37u);
+    CHECK_U32(lcm.brightness_idle, 37u);
+    CHECK_U32(lcm.status_brightness, 19u);
+
+    lcm_fakes_set_runtime_status(false, false);
+    lcm_configure(&lcm, &leds);
+    CHECK_U32(lcm.brightness, 0u);
+    CHECK_U32(lcm.brightness_idle, 0u);
+    CHECK_U32(lcm.status_brightness, 0u);
+
+    lcm.enabled = false;
+    lcm.brightness = 99;
+    lcm_fakes_set_runtime_status(true, true);
+    lcm_configure(&lcm, &leds);
+    CHECK_U32(lcm.brightness, 99u);
+
+    return true;
+}
+
+static sigjmp_buf lcm_configure_sigsegv_env;
+
+enum { TEST_SIGSEGV = 11 };
+
+static void catch_lcm_configure_sigsegv(int signal_number) {
+    unused(signal_number);
+    siglongjmp(lcm_configure_sigsegv_env, 1);
+}
+
+static bool test_lcm_configure_requires_initialized_led_config(void) {
+    SignalHandler previous_handler = signal(TEST_SIGSEGV, catch_lcm_configure_sigsegv);
+
+    if (sigsetjmp(lcm_configure_sigsegv_env, 1) != 0) {
+        signal(TEST_SIGSEGV, previous_handler);
+        return false;
+    }
+
+    LcmData lcm = {0};
+    lcm.enabled = true;
+    Leds leds = {0};
+    lcm_fakes_set_runtime_status(true, false);
+
+    lcm_configure(&lcm, &leds);
+    signal(TEST_SIGSEGV, previous_handler);
+
+    CHECK_U32(lcm.brightness, 0u);
+    CHECK_U32(lcm.brightness_idle, 0u);
+    CHECK_U32(lcm.status_brightness, 0u);
+    CHECK(lcm.lights_off_when_lifted);
+
+    return true;
+}
+
+static bool test_lcm_poll_response_pitch_payload_and_name_edges(void) {
+    vesc_if_fake_reset();
+    vesc_if_fake_set_motor_telemetry(0, 0, 0, 0, 0, 0, 2.0f, 49.5f, 0, 0);
+
+    LcmData lcm = {0};
+    lcm.enabled = true;
+    lcm.brightness = 11;
+    lcm.brightness_idle = 22;
+    lcm.status_brightness = 33;
+    lcm.lights_off_when_lifted = true;
+
+    uint8_t empty_name[] = {0};
+    memcpy(lcm.name, "Previous", 9);
+    lcm_poll_request(&lcm, empty_name, 0);
+    CHECK(strcmp(lcm.name, "Previous") == 0);
+
+    uint8_t long_name[MAX_LCM_NAME_LENGTH + 4];
+    memset(long_name, 'A', sizeof(long_name));
+    long_name[MAX_LCM_NAME_LENGTH - 1] = '\0';
+    lcm_poll_request(&lcm, long_name, sizeof(long_name));
+    CHECK(strlen(lcm.name) == MAX_LCM_NAME_LENGTH - 1);
+
+    unsigned char ctrl[] = {44, 55, 66, 77, 88, 99};
+    lcm_light_ctrl_request(&lcm, ctrl, (int) sizeof(ctrl));
+    CHECK_U32(lcm.brightness, 44u);
+    CHECK_U32(lcm.payload_size, 3u);
+
+    State state = {.state = STATE_READY, .mode = MODE_NORMAL};
+    MotorData motor = {0};
+    motor.erpm = 123.0f;
+    lcm_poll_response(&lcm, &state, FS_RIGHT, &motor, -27.4f);
+
+    size_t len = 0;
+    const uint8_t *payload = vesc_if_fake_last_app_data(&len);
+    CHECK(payload != NULL);
+    CHECK_U32(payload[1], COMMAND_LCM_POLL);
+    CHECK_U32(payload[4], 27u);
+    CHECK_U32(payload[11], 44u);
+    CHECK_U32(payload[12], 55u);
+    CHECK_U32(payload[13], 66u);
+    CHECK_U32(payload[14], 77u);
+    CHECK_U32(payload[15], 88u);
+    CHECK_U32(payload[16], 99u);
+    CHECK_U32(lcm.payload_size, 0u);
+
+    lcm.lights_off_when_lifted = false;
+    lcm_poll_response(&lcm, &state, FS_NONE, &motor, 62.0f);
+    payload = vesc_if_fake_last_app_data(&len);
+    CHECK(payload != NULL);
+    CHECK_U32(payload[4], 0u);
+    CHECK_U32(len, 14u);
+
+    return true;
+}
+
+static bool test_lcm_poll_request_name_length_bound(void) {
+    LcmData lcm = {0};
+    lcm.enabled = true;
+    memset(lcm.name, 0, sizeof(lcm.name));
+
+    uint8_t request[] = {'A', 'B', 'C', 'Z'};
+    lcm_poll_request(&lcm, request, 3);
+
+    CHECK(strcmp(lcm.name, "ABC") == 0);
+
+    return true;
+}
+
+static bool test_lcm_poll_response_saturates_byte_fields(void) {
+    vesc_if_fake_reset();
+
+    LcmData lcm = {0};
+    lcm.enabled = true;
+    lcm.lights_off_when_lifted = true;
+
+    State state = {.state = STATE_READY, .mode = MODE_NORMAL};
+    MotorData motor = {0};
+
+    lcm_poll_response(&lcm, &state, FS_NONE, &motor, 300.0f);
+
+    size_t len = 0;
+    const uint8_t *payload = vesc_if_fake_last_app_data(&len);
+    CHECK(payload != NULL);
+    CHECK_U32(len, 14u);
+    CHECK_U32(payload[1], COMMAND_LCM_POLL);
+    CHECK_U32(payload[4], UINT8_MAX);
+
+    state.state = STATE_RUNNING;
+    motor.duty_cycle.value = 3.0f;
+    lcm_poll_response(&lcm, &state, FS_NONE, &motor, 0.0f);
+
+    payload = vesc_if_fake_last_app_data(&len);
+    CHECK(payload != NULL);
+    CHECK_U32(payload[4], 100u);
+
+    return true;
+}
+
+static bool test_lcm_battery_response_nonfinite_values_are_stable(void) {
+    const float values[] = {NAN, INFINITY, -INFINITY};
+
+    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
+        vesc_if_fake_reset();
+        vesc_if_fake_set_battery_level(values[i]);
+
+        LcmData lcm = {0};
+        lcm.enabled = true;
+
+        lcm_get_battery_response(&lcm);
+
+        size_t len = 0;
+        const uint8_t *payload = vesc_if_fake_last_app_data(&len);
+        CHECK(payload != NULL);
+        CHECK_U32(len, 6u);
+        CHECK_U32(payload[0], 101u);
+        CHECK_U32(payload[1], COMMAND_LCM_GET_BATTERY);
+
+        int32_t index = 2;
+        CHECK_U32(buffer_get_uint32(payload, &index), 0u);
+        CHECK_U32(index, 6u);
+    }
+
+    return true;
+}
+
