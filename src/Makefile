@@ -2,6 +2,8 @@
 # from settings.xml using this file as well, otherwise Refloat Cfg will not
 # load in vesc_tool, see comment below.
 
+SHELL := /bin/sh
+
 VESC_TOOL ?= vesc_tool
 
 TARGET = package_lib
@@ -18,6 +20,7 @@ DEPS = $(SOURCES:.c=.d)
 ADD_TO_CLEAN = $(CONF_GEN_FILES) $(DEPS) conf/conf_general.h
 
 ROOT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO_ROOT := $(abspath $(ROOT_DIR)/..)
 VESC_C_LIB_PATH = ../vesc_pkg_lib/
 include $(VESC_C_LIB_PATH)rules.mk
 
@@ -31,22 +34,33 @@ $(CONF_GEN_FILES) &: conf/settings.xml
 	# !!! make xml config loading in vesc_tool work with LTO !!!
 	sed -i "s/^uint8_t data_/__attribute__((used)) uint8_t data_/g" conf/confxml.c
 
-PACKAGE_NAME=`cat ../package_name | cut -c-20`
-VERSION=`cat ../version`
-MAJOR=`cat ../version | cut -d. -f1`
-MINOR=`cat ../version | cut -d. -f2`
-PATCH=`cat ../version | cut -d. -f3 | cut -d- -f1`
-SUFFIX=`cat ../version | cut -d. -f3 | cut -d- -f2- | cut -c-20`
-GIT_HASH=`git rev-parse --short=8 HEAD | cut -c-8`
+PACKAGE_NAME := $(shell sed -n '1s/^\(.\{0,20\}\).*/\1/p' ../package_name)
+VERSION := $(shell sed -n '1p' ../version)
+MAJOR := $(word 1,$(subst ., ,$(VERSION)))
+MINOR := $(word 2,$(subst ., ,$(VERSION)))
+PATCH_SUFFIX := $(word 3,$(subst ., ,$(VERSION)))
+PATCH := $(word 1,$(subst -, ,$(PATCH_SUFFIX)))
+SUFFIX := $(shell printf '%s\n' '$(PATCH_SUFFIX)' | sed 's/^[^-]*-*//' | cut -c-20)
+GIT_HASH := $(shell git rev-parse --short=8 HEAD | cut -c-8)
+GIT_HEAD := $(shell git -C $(REPO_ROOT) rev-parse --git-path HEAD 2>/dev/null)
+GIT_REF := $(shell git -C $(REPO_ROOT) symbolic-ref -q HEAD 2>/dev/null)
+GIT_REF_FILE := $(if $(GIT_REF),$(shell git -C $(REPO_ROOT) rev-parse --git-path $(GIT_REF) 2>/dev/null))
+GIT_PACKED_REFS := $(shell git -C $(REPO_ROOT) rev-parse --git-path packed-refs 2>/dev/null)
+GIT_DEPS := $(wildcard $(foreach path,$(GIT_HEAD) $(GIT_REF_FILE) $(GIT_PACKED_REFS),$(abspath $(REPO_ROOT)/$(path))))
 
-conf/conf_general.h: conf/conf_general.h.in ../package_name ../version
-	cat $< | \
-	sed "s/{{PACKAGE_NAME}}/${PACKAGE_NAME}/g" | \
-	sed "s/{{VERSION}}/${VERSION}/g" | \
-	sed "s/{{MAJOR_VERSION}}/${MAJOR}/g" | \
-	sed "s/{{MINOR_VERSION}}/${MINOR}/g" | \
-	sed "s/{{PATCH_VERSION}}/${PATCH}/g" | \
-	sed "s/{{VERSION_SUFFIX}}/${SUFFIX}/g" | \
-	sed "s/{{GIT_HASH}}/${GIT_HASH}/g" > $@
+conf/conf_general.h: FORCE conf/conf_general.h.in ../package_name ../version $(GIT_DEPS)
+	cat conf/conf_general.h.in | \
+	sed "s/{{PACKAGE_NAME}}/$(PACKAGE_NAME)/g" | \
+	sed "s/{{VERSION}}/$(VERSION)/g" | \
+	sed "s/{{MAJOR_VERSION}}/$(MAJOR)/g" | \
+	sed "s/{{MINOR_VERSION}}/$(MINOR)/g" | \
+	sed "s/{{PATCH_VERSION}}/$(PATCH)/g" | \
+	sed "s/{{VERSION_SUFFIX}}/$(SUFFIX)/g" | \
+	sed "s/{{GIT_HASH}}/$(GIT_HASH)/g" > $@.tmp
+	if ! cmp -s $@.tmp $@; then mv $@.tmp $@; else rm -f $@.tmp; fi
+
+FORCE:
+
+.PHONY: FORCE
 
 -include $(DEPS)
