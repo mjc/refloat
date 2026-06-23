@@ -45,11 +45,12 @@ void atr_reset(ATR *atr) {
 }
 
 void atr_configure(ATR *atr, const RefloatConfig *config, float frequency) {
+    float speed_boost = clampf(config->atr_speed_boost, -1.0f, 1.0f);
     atr->speed_boost_mult = 1.0f / 3000.0f;
-    if (fabsf(config->atr_speed_boost) > 0.4f) {
+    if (fabsf(speed_boost) > 0.4f) {
         // above 0.4 we add 500erpm for each extra 10% of speed boost, so at
         // most +6000 for 100% speed boost
-        atr->speed_boost_mult = 1.0f / ((fabsf(config->atr_speed_boost) - 0.4f) * 5000 + 3000.0f);
+        atr->speed_boost_mult = 1.0f / ((fabsf(speed_boost) - 0.4f) * 5000 + 3000.0f);
     }
 
     atr->ad_alpha3 = ema_calculate_alpha(10.0f, frequency);
@@ -57,16 +58,18 @@ void atr_configure(ATR *atr, const RefloatConfig *config, float frequency) {
     atr->ad_alpha1 = ema_calculate_alpha(1.0f, frequency);
 
     ema_configure(&atr->transition_target, 6.0f, frequency);
+    // Programmatic/XML custom config updates can exceed the declared 100
+    // degree/s ATR engage and release limits before serialization over BTLE.
     smooth_setpoint_configure(
         &atr->setpoint,
         config->atr.filter.time_constant,
         config->atr.filter.on_speed_time_constant,
         config->atr.filter.off_speed_time_constant,
         0.2f,
-        config->atr.filter.on_speed_limit,
-        config->atr.filter.off_speed_limit,
-        config->atr.filter.on_speed_limit,
-        config->atr.filter.off_speed_limit,
+        clampf(config->atr.filter.on_speed_limit, 0.0f, 100.0f),
+        clampf(config->atr.filter.off_speed_limit, 0.0f, 100.0f),
+        clampf(config->atr.filter.on_speed_limit, 0.0f, 100.0f),
+        clampf(config->atr.filter.off_speed_limit, 0.0f, 100.0f),
         frequency
     );
 }
@@ -80,12 +83,18 @@ void atr_update(
         return;
     }
 
+    // Legacy BTLE tuning reaches 7.5 degrees, wider than the XML editor's
+    // current 5-degree threshold range.
+    float atr_threshold =
+        clampf(motor->braking ? config->atr_threshold_down : config->atr_threshold_up, 0.0f, 7.5f);
+
     float abs_torque = fabsf(motor->torque);
     float torque_offset = 8 * TORQUE_CONSTANT_COMPAT;  // hard-code to 8A
-    float atr_threshold = motor->braking ? config->atr_threshold_down : config->atr_threshold_up;
-    float accel_factor =
-        (motor->braking ? config->atr_amps_decel_ratio : config->atr_amps_accel_ratio) *
-        TORQUE_CONSTANT_COMPAT;
+    // Positive ratios below the configured 5A/4A minima exaggerate expected
+    // acceleration; custom config can supply them even though the UI cannot.
+    float accel_ratio = motor->braking ? clampf(config->atr_amps_decel_ratio, 4.0f, 30.0f)
+                                       : clampf(config->atr_amps_accel_ratio, 5.0f, 30.0f);
+    float accel_factor = accel_ratio * TORQUE_CONSTANT_COMPAT;
     float accel_factor2 = accel_factor * 1.3;
 
     // compare measured acceleration to expected acceleration
@@ -120,8 +129,13 @@ void atr_update(
     // -------------+------+-------
     //         forward | up   | down
     //        !forward | down | up
-    float atr_strength = motor->forward == (atr->accel_diff > 0) ? config->atr_strength_up
-                                                                 : config->atr_strength_down;
+    // Both ATR directions are defined for strengths through 3.5.
+    float atr_strength = clampf(
+        motor->forward == (atr->accel_diff > 0) ? config->atr_strength_up
+                                                : config->atr_strength_down,
+        0.0f,
+        3.5f
+    );
 
     // from 3000 to 6000..9000 erpm gradually crank up the torque response
     if (motor->abs_erpm > 3000 && !motor->braking) {
@@ -129,7 +143,8 @@ void atr_update(
         // configured speedboost can now also be negative (-1..1)
         // -1 brings it to 0 (if erpm exceeds 9000)
         // +1 doubles it     (if erpm exceeds 9000)
-        atr->speed_boost = fminf(1, speed_boost_mult) * config->atr_speed_boost;
+        atr->speed_boost =
+            fminf(1, speed_boost_mult) * clampf(config->atr_speed_boost, -1.0f, 1.0f);
         atr_strength += atr_strength * atr->speed_boost;
     } else {
         atr->speed_boost = 0.0f;
@@ -143,7 +158,9 @@ void atr_update(
         new_atr_target -= sign(new_atr_target) * atr_threshold;
     }
 
-    atr->target = clampf(new_atr_target, -config->atr_angle_limit, config->atr_angle_limit);
+    float angle_limit = clampf(config->atr_angle_limit, 0.0f, 30.0f);
+    // new_atr_target is finite because all inputs above are bounded finite telemetry/config values.
+    atr->target = clampf(new_atr_target, -angle_limit, angle_limit);  // GCOVR_EXCL_BR_LINE
 
     ema_update(&atr->transition_target, atr->target);
 
@@ -153,8 +170,9 @@ void atr_update(
     // signs and the degree diff is greater than 1
     if (atr->setpoint.value * transition_target < 0 && degrees_diff > 0.0f) {
         // Scale the transition multiplier linearly from 1 to 2 degrees of difference
-        atr->transition_boost =
-            1.0f + min(degrees_diff, 1.0f) * (config->atr.transition_boost - 1.0f);
+        // Custom configs can exceed the transition multiplier's 1..4 domain.
+        atr->transition_boost = 1.0f +
+            min(degrees_diff, 1.0f) * (clampf(config->atr.transition_boost, 1.0f, 4.0f) - 1.0f);
     } else {
         atr->transition_boost = 1.0f;
     }

@@ -40,14 +40,18 @@ void booster_update(
     float torque;
     float angle;
     float ramp;
+    // Custom configs can bypass the current bounds. The legacy BTLE tuning
+    // protocol permits a 17-degree ramp, wider than the current XML editor.
+    // Booster angle is intentionally not upper-bounded: handtest/flywheel use
+    // 100 degrees as the established disable sentinel.
     if (md->braking) {
-        torque = config->brkbooster_current * TORQUE_CONSTANT_COMPAT;
-        angle = config->brkbooster_angle;
-        ramp = config->brkbooster_ramp;
+        torque = clampf(config->brkbooster_current, 0.0f, 100.0f) * TORQUE_CONSTANT_COMPAT;
+        angle = fmaxf(config->brkbooster_angle, 0.0f);
+        ramp = clampf(config->brkbooster_ramp, 1.0f, 17.0f);
     } else {
-        torque = config->booster_current * TORQUE_CONSTANT_COMPAT;
-        angle = config->booster_angle;
-        ramp = config->booster_ramp;
+        torque = clampf(config->booster_current, 0.0f, 100.0f) * TORQUE_CONSTANT_COMPAT;
+        angle = fmaxf(config->booster_angle, 0.0f);
+        ramp = clampf(config->booster_ramp, 1.0f, 17.0f);
     }
 
     // Make booster a bit stronger at higher speed (up to 2x stronger when braking)

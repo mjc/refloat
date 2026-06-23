@@ -78,6 +78,7 @@ void reverse_stop_update(
             rs->target_distance = 0.0f;
         }
         ema_reset(&rs->progress, new_progress);
+        timer_refresh(time, &rs->timer);
 
         return;
     }
@@ -93,7 +94,9 @@ void reverse_stop_update(
         rs->current_distance = new_distance;
     }
 
-    ema_update(&rs->progress, rs->current_distance / rs->target_distance);
+    ema_update(
+        &rs->progress, rs->current_distance / rs->target_distance
+    );  // GCOVR_EXCL_BR_LINE: target_distance is nonzero on this path.
 
     if (rs->progress.value >= 1.0f) {
         rs->target_distance = 0.0f;

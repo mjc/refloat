@@ -34,9 +34,11 @@ void motor_control_init(MotorControl *mc) {
 }
 
 void motor_control_configure(MotorControl *mc, const RefloatConfig *config, uint16_t frequency) {
-    mc->brake_current = config->brake_current;
-    mc->click_current = config->startup_click_current;
-    mc->parking_brake_mode = config->parking_brake_mode;
+    mc->brake_current = clampf(config->brake_current, 0.0f, 100.0f);
+    mc->click_current = clampf(config->startup_click_current, 0.0f, 20.0f);
+    mc->parking_brake_mode = config->parking_brake_mode <= PARKING_BRAKE_NEVER
+        ? config->parking_brake_mode
+        : PARKING_BRAKE_NEVER;
     mc->main_freq = frequency / 2;
 }
 
@@ -52,6 +54,7 @@ static inline void reset_tone(MotorControl *mc) {
 
 void motor_control_apply(MotorControl *mc, float abs_erpm, RunState state, const Time *time) {
     if (state == STATE_DISABLED) {
+        mc->requested_current = NAN;
         if (!mc->disabled) {
             // set 0A only once to reset any previously-set current, then stop touching the motor
             VESC_IF->mc_set_current(0.0f);
@@ -103,16 +106,15 @@ void motor_control_apply(MotorControl *mc, float abs_erpm, RunState state, const
             timer_refresh(time, &mc->brake_timer);
         }
 
-        if (timer_older(time, mc->brake_timer, 1)) {
-            // Release the motor by setting zero current
-            VESC_IF->mc_set_current(0.0f);
-            return;
-        }
-
         if (mc->parking_brake_active && abs_erpm < 2000) {
             // Duty Cycle mode has better holding power (phase-shorting on 6.05)
             VESC_IF->mc_set_duty(0);
         } else {
+            if (timer_older(time, mc->brake_timer, 1)) {
+                // Release the motor by setting zero current
+                VESC_IF->mc_set_current(0.0f);
+                return;
+            }
             // Use brake current over certain ERPM to avoid MOSFET overcurrent
             VESC_IF->mc_set_brake_current(mc->brake_current);
         }
@@ -122,7 +124,11 @@ void motor_control_apply(MotorControl *mc, float abs_erpm, RunState state, const
 }
 
 void motor_control_play_tone(MotorControl *mc, uint16_t frequency, float intensity) {
-    uint8_t new_ticks = max(1, mc->main_freq / frequency);
+    if (frequency == 0) {
+        return;
+    }
+    uint16_t ticks = max(1, mc->main_freq / frequency);
+    uint8_t new_ticks = min(ticks, UINT8_MAX);
     if (new_ticks != mc->tone_ticks) {
         mc->tone_ticks = new_ticks;
         mc->tone_counter = mc->tone_ticks;

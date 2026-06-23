@@ -34,16 +34,18 @@ void torque_tilt_reset(TorqueTilt *tt) {
 }
 
 void torque_tilt_configure(TorqueTilt *tt, const RefloatConfig *config, float frequency) {
+    // Custom configs sent over BTLE can bypass the 100 degree/s engage and
+    // release ceilings used by the torque-tilt editor.
     smooth_setpoint_configure(
         &tt->setpoint,
         config->torque_tilt.filter.time_constant,
         config->torque_tilt.filter.on_speed_time_constant,
         config->torque_tilt.filter.off_speed_time_constant,
         0.2f,
-        config->torque_tilt.filter.on_speed_limit,
-        config->torque_tilt.filter.off_speed_limit,
-        config->torque_tilt.filter.on_speed_limit,
-        config->torque_tilt.filter.off_speed_limit,
+        clampf(config->torque_tilt.filter.on_speed_limit, 0.0f, 100.0f),
+        clampf(config->torque_tilt.filter.off_speed_limit, 0.0f, 100.0f),
+        clampf(config->torque_tilt.filter.on_speed_limit, 0.0f, 100.0f),
+        clampf(config->torque_tilt.filter.off_speed_limit, 0.0f, 100.0f),
         frequency
     );
 }
@@ -56,15 +58,23 @@ void torque_tilt_update(
         return;
     }
 
+    // COMM_SET_CUSTOM_CONFIG can bypass the 1 degree/A strength and 100A
+    // threshold ceilings used by both torque-tilt directions.
     float strength =
-        (motor->braking ? config->torquetilt_strength_regen : config->torquetilt_strength) *
+        clampf(
+            motor->braking ? config->torquetilt_strength_regen : config->torquetilt_strength,
+            0.0f,
+            1.0f
+        ) *
         (1 / TORQUE_CONSTANT_COMPAT);
-
     float torque_base = fmaxf(
-        (fabsf(motor->torque) - config->torquetilt_start_current * TORQUE_CONSTANT_COMPAT), 0
+        fabsf(motor->torque) -
+            clampf(config->torquetilt_start_current, 0.0f, 100.0f) * TORQUE_CONSTANT_COMPAT,
+        0
     );
     tt->target =
-        fminf(torque_base * strength, config->torquetilt_angle_limit) * sign(motor->torque);
+        fminf(torque_base * strength, clampf(config->torquetilt_angle_limit, 0.0f, 30.0f)) *
+        sign(motor->torque);
 
     smooth_setpoint_update(&tt->setpoint, tt->target, motor->forward, 1.0f, dt);
 }

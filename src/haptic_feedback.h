@@ -35,6 +35,7 @@ typedef enum {
 typedef struct {
     const CfgHapticFeedback *cfg;
     float duty_solid_threshold;
+    float min_strength;
     float str_poly_b;
     float str_poly_c;
 

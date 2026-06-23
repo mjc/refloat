@@ -35,14 +35,20 @@ void brake_tilt_reset(BrakeTilt *bt) {
 }
 
 void brake_tilt_configure(BrakeTilt *bt, const RefloatConfig *config, float frequency) {
-    if (config->braketilt_strength == 0) {
+    // A raw custom config must not enable a feature whose valid zero disables it.
+    float strength = clampf(config->braketilt_strength, 0.0f, 20.0f);
+    if (strength == 0) {
         bt->factor = 0;
     } else {
         // incorporate negative sign into braketilt factor instead of adding it each balance loop
-        bt->factor = -(0.5f + (20 - config->braketilt_strength) / 5.0f);
+        bt->factor = -(0.5f + (20 - strength) / 5.0f);
     }
 
-    float off_speed = config->atr.filter.off_speed_limit / max(config->braketilt_lingering, 1);
+    // Legacy BTLE tuning encodes lingering through 15, wider than the XML editor.
+    float lingering = clampf(config->braketilt_lingering, 1.0f, 15.0f);
+    // Custom configs can bypass the shared ATR rate editors' 100 degree/s ceiling.
+    float on_speed = clampf(config->atr.filter.on_speed_limit, 0.0f, 100.0f);
+    float off_speed = clampf(config->atr.filter.off_speed_limit, 0.0f, 100.0f) / lingering;
 
     smooth_setpoint_configure(
         &bt->setpoint,
@@ -50,9 +56,9 @@ void brake_tilt_configure(BrakeTilt *bt, const RefloatConfig *config, float freq
         config->atr.filter.on_speed_time_constant,
         config->atr.filter.off_speed_time_constant,
         0.2f,
-        config->atr.filter.on_speed_limit,
+        on_speed,
         off_speed,
-        config->atr.filter.on_speed_limit,
+        on_speed,
         off_speed,
         frequency
     );
@@ -70,6 +76,8 @@ void brake_tilt_update(
         smooth_setpoint_winddown(&bt->setpoint);
         return;
     }
+
+    bt->target = 0;
 
     // braking also should cause setpoint change lift, causing a delayed lingering nose lift
     if (bt->factor < 0 && motor->braking && motor->abs_erpm > 2000) {
@@ -89,8 +97,6 @@ void brake_tilt_update(
                 bt->target = 0;
             }
         }
-    } else {
-        bt->target = 0;
     }
 
     smooth_setpoint_update(&bt->setpoint, bt->target, motor->forward, 1.0f, dt);
