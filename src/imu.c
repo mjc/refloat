@@ -34,14 +34,31 @@ void imu_init(IMU *imu) {
 
 void imu_update(IMU *imu, const BalanceFilterData *bf, const State *state) {
     float roll_rad = VESC_IF->imu_get_roll();  // in Radians
+    if (!isfinite(roll_rad)) {
+        roll_rad = 0.0f;
+    }
 
-    imu->pitch = rad2deg(VESC_IF->imu_get_pitch());
+    float pitch_rad = VESC_IF->imu_get_pitch();
+    float yaw_rad = VESC_IF->imu_get_yaw();
+    if (!isfinite(pitch_rad)) {
+        pitch_rad = 0.0f;
+    }
+    if (!isfinite(yaw_rad)) {
+        yaw_rad = 0.0f;
+    }
+    imu->pitch = rad2deg(pitch_rad);
     imu->roll = rad2deg(roll_rad);
-    imu->yaw = rad2deg(VESC_IF->imu_get_yaw());
-    imu->balance_pitch = rad2deg(balance_filter_get_pitch(bf));
+    imu->yaw = rad2deg(yaw_rad);
+    float balance_pitch = balance_filter_get_pitch(bf);
+    imu->balance_pitch = isfinite(balance_pitch) ? rad2deg(balance_pitch) : 0.0f;
 
     float gyro[3];
     VESC_IF->imu_get_gyro(gyro);
+    for (size_t i = 0; i < 3; ++i) {
+        if (!isfinite(gyro[i])) {
+            gyro[i] = 0.0f;
+        }
+    }
 
     float sin_roll = sinf(roll_rad);
     float cos_roll = cosf(roll_rad);

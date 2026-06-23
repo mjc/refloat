@@ -36,9 +36,13 @@ void remote_init(Remote *remote, const Time *time) {
 }
 
 void remote_reset(Remote *remote, const Time *time) {
+    remote->input = 0.0f;
     smooth_setpoint_reset(&remote->setpoint);
     remote->move_speed = NAN;
     remote->move_pid_i = 0.0f;
+    timer_expire(time, &remote->command_input_time, REMOTE_TIMEOUT);
+    // timer_older() is strict, so expire command ownership one tick past the boundary.
+    remote->command_input_time--;
     timer_expire(time, &remote->move_idle_time, MOVE_IDLE_TIMEOUT);
 }
 
@@ -88,13 +92,23 @@ void remote_input(Remote *remote, const Time *time, const RefloatConfig *config)
         return;
     }
 
-    float deadband = config->inputtilt_deadband;
+    if (!isfinite(value)) {
+        remote->input = 0.0f;
+        remote->move_speed = NAN;
+        return;
+    }
+
+    // Custom config writes can bypass the editor's 50% deadband ceiling.
+    float deadband = clampf(config->inputtilt_deadband, 0.0f, 0.5f);
     float value_abs = fabsf(value);
     if (value_abs < deadband) {
         value = 0.0;
     } else {
         value = sign(value) * (value_abs - deadband) / (1 - deadband);
     }
+
+    // vTx 1 can carry 255 even though remote move is specified for 0..10 km/h.
+    const float max_move_speed = min(config->remote.max_move_speed, 10u);
 
     // remote move logic
     if (value == 0.0f) {
@@ -104,10 +118,13 @@ void remote_input(Remote *remote, const Time *time, const RefloatConfig *config)
             remote->move_speed = 0.0f;
         }
     } else {
-        if (config->remote.max_move_speed > 0 &&
-            time_elapsed(time, disengage, config->remote_throttle_grace_period)) {
-            remote->move_speed = value * config->remote.max_move_speed;
+        // The configured post-disengage delay is defined for 0..60 seconds.
+        float grace_period = clampf(config->remote_throttle_grace_period, 0.0f, 60.0f);
+        if (max_move_speed > 0 && time_elapsed(time, disengage, grace_period)) {
+            remote->move_speed = value * max_move_speed;
             timer_refresh(time, &remote->move_idle_time);
+        } else {
+            remote->move_speed = NAN;
         }
     }
 
@@ -121,11 +138,18 @@ void remote_input(Remote *remote, const Time *time, const RefloatConfig *config)
 void remote_command_input(
     Remote *remote, float value, const Time *time, const RefloatConfig *config
 ) {
-    remote->input = value;
-    if (time_elapsed(time, disengage, 2.0f)) {
+    remote->input = config->inputtilt_invert_throttle ? -value : value;
+    float grace_period = clampf(config->remote_throttle_grace_period, 0.0f, 60.0f);
+    if (time_elapsed(time, disengage, grace_period)) {
+        // Apply the same BTLE-reachable uint8 bound to app remote commands.
         // default to a limit of 5 km/h if limit of 0 is configured for the remote
-        float speed_max = config->remote.max_move_speed > 0 ? config->remote.max_move_speed : 5;
+        float speed_max = min(config->remote.max_move_speed, 10u);
+        if (speed_max == 0.0f) {
+            speed_max = 5.0f;
+        }
         remote->move_speed = value * speed_max;
+    } else {
+        remote->move_speed = NAN;
     }
 
     timer_refresh(time, &remote->command_input_time);
@@ -135,7 +159,9 @@ float remote_get_move_torque(Remote *remote, float speed, float dt) {
     if (!isnan(remote->move_speed)) {
         float error = remote->move_speed - speed;
 
-        remote->move_pid_i += MOVE_KI * error * dt;
+        if (isfinite(dt) && dt > 0.0f) {
+            remote->move_pid_i += MOVE_KI * error * dt;
+        }
         remote->move_pid_i = clampf(remote->move_pid_i, -MOVE_TORQUE_LIMIT, MOVE_TORQUE_LIMIT);
 
         return clampf(MOVE_KP * error + remote->move_pid_i, -MOVE_TORQUE_LIMIT, MOVE_TORQUE_LIMIT);
@@ -146,7 +172,8 @@ float remote_get_move_torque(Remote *remote, float speed, float dt) {
 }
 
 void remote_update(Remote *remote, const State *state, const RefloatConfig *config, float dt) {
-    float target = remote->input * config->inputtilt_angle_limit;
+    // Custom config packets bypass the VESC Tool UI's field bounds.
+    float target = remote->input * clampf(config->inputtilt_angle_limit, 0.0f, 90.0f);
 
     if (state->darkride) {
         target = -target;
