@@ -61,7 +61,10 @@ static bool buffer_item_eq(BufferItem lhs, BufferItem rhs) {
 
 #include "c_tests/frequency_tracker/tests.c"
 #include "c_tests/smooth_setpoint/tests.c"
-#include "c_tests/input_remote_imu/tests.c"
+#include "c_tests/footpad_sensor/tests.c"
+#include "c_tests/charging/tests.c"
+#include "c_tests/remote/tests.c"
+#include "c_tests/imu/tests.c"
 #include "c_tests/bms/tests.c"
 #include "c_tests/tilt_balance/tests.c"
 #include "c_tests/motor/tests.c"
