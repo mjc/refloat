@@ -115,6 +115,54 @@ target_compile_options(
     "$<$<BOOL:${REFLOAT_STRICT_WARNINGS}>:-Werror>"
 )
 
+function(refloat_add_c_test target source test_name)
+  set(options WILL_FAIL)
+  set(oneValueArgs)
+  set(multiValueArgs LINK_LIBRARIES LABELS COMPILE_DEFINITIONS DEPENDS)
+  cmake_parse_arguments(REFLOAT_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  add_executable(${target} ${source})
+  target_link_libraries(${target} PRIVATE refloat_host_c_options ${REFLOAT_TEST_LINK_LIBRARIES})
+  if(REFLOAT_TEST_COMPILE_DEFINITIONS)
+    target_compile_definitions(${target} PRIVATE ${REFLOAT_TEST_COMPILE_DEFINITIONS})
+  endif()
+  add_dependencies(${target} refloat_generated_conf ${REFLOAT_TEST_DEPENDS})
+  add_test(NAME ${test_name} COMMAND ${target})
+  if(REFLOAT_TEST_LABELS)
+    set_tests_properties(${test_name} PROPERTIES LABELS "${REFLOAT_TEST_LABELS}")
+  endif()
+  if(REFLOAT_TEST_WILL_FAIL)
+    set_tests_properties(${test_name} PROPERTIES WILL_FAIL TRUE)
+  endif()
+endfunction()
+
+function(refloat_add_cpp_test target source test_name)
+  set(options WILL_FAIL)
+  set(oneValueArgs)
+  set(multiValueArgs LINK_LIBRARIES LABELS COMPILE_DEFINITIONS DEPENDS)
+  cmake_parse_arguments(REFLOAT_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  add_executable(${target} ${source})
+  target_link_libraries(
+    ${target}
+    PRIVATE
+      refloat_host_cpp_options
+      Catch2::Catch2WithMain
+      ${REFLOAT_TEST_LINK_LIBRARIES}
+  )
+  if(REFLOAT_TEST_COMPILE_DEFINITIONS)
+    target_compile_definitions(${target} PRIVATE ${REFLOAT_TEST_COMPILE_DEFINITIONS})
+  endif()
+  add_dependencies(${target} refloat_generated_conf ${REFLOAT_TEST_DEPENDS})
+  add_test(NAME ${test_name} COMMAND ${target})
+  if(REFLOAT_TEST_LABELS)
+    set_tests_properties(${test_name} PROPERTIES LABELS "${REFLOAT_TEST_LABELS}")
+  endif()
+  if(REFLOAT_TEST_WILL_FAIL)
+    set_tests_properties(${test_name} PROPERTIES WILL_FAIL TRUE)
+  endif()
+endfunction()
+
 add_custom_command(
   OUTPUT ${REFLOAT_GENERATED_CONF_OUTPUTS}
   COMMAND "${REFLOAT_MAKE_EXECUTABLE}" -C tests generated_conf
@@ -226,32 +274,31 @@ target_link_libraries(refloat_led_driver_fake PRIVATE refloat_host_c_options)
 add_library(refloat_leds_main_fakes STATIC "${REFLOAT_TEST_DIR}/leds_main_fakes.c")
 target_link_libraries(refloat_leds_main_fakes PRIVATE refloat_host_c_options)
 
-add_executable(refloat-c-tests "${REFLOAT_TEST_DIR}/c_tests.c")
-target_link_libraries(
+refloat_add_c_test(
   refloat-c-tests
-  PRIVATE
-    refloat_host_c_options
+  "${REFLOAT_TEST_DIR}/c_tests.c"
+  c.host
+  LINK_LIBRARIES
     refloat_host_common
     refloat_vesc_fake
     refloat_host_test_fakes
+  LABELS
+    "host;c"
 )
-add_dependencies(refloat-c-tests refloat_generated_conf)
-add_test(NAME c.host COMMAND refloat-c-tests)
-set_tests_properties(c.host PROPERTIES LABELS "host;c")
 
-add_executable(refloat-led-tests "${REFLOAT_TEST_DIR}/led_tests.c")
-target_link_libraries(
+refloat_add_c_test(
   refloat-led-tests
-  PRIVATE
-    refloat_host_c_options
+  "${REFLOAT_TEST_DIR}/led_tests.c"
+  leds.host
+  LINK_LIBRARIES
     refloat_led_common
     refloat_vesc_fake
     refloat_led_driver_fake
+  LABELS
+    "host;leds"
+  COMPILE_DEFINITIONS
+    __time_t_defined
 )
-target_compile_definitions(refloat-led-tests PRIVATE __time_t_defined)
-add_dependencies(refloat-led-tests refloat_generated_conf)
-add_test(NAME leds.host COMMAND refloat-led-tests)
-set_tests_properties(leds.host PROPERTIES LABELS "host;leds")
 
 add_library(refloat_main_bridge STATIC "${REFLOAT_TEST_DIR}/main_protocol_wrapper.c")
 target_link_libraries(
@@ -265,208 +312,144 @@ target_link_libraries(
 )
 add_dependencies(refloat_main_bridge refloat_generated_conf)
 
-add_executable(
+refloat_add_c_test(
   refloat-main-tests
   "${REFLOAT_TEST_DIR}/main_protocol_tests.c"
-)
-target_link_libraries(
-  refloat-main-tests
-  PRIVATE
-    refloat_host_c_options
+  main.host
+  LINK_LIBRARIES
     refloat_host_common
     refloat_main_bridge
     refloat_vesc_fake
     refloat_host_test_fakes
     refloat_leds_main_fakes
+  LABELS
+    "host;main"
 )
-add_dependencies(refloat-main-tests refloat_generated_conf)
-add_test(NAME main.host COMMAND refloat-main-tests)
-set_tests_properties(main.host PROPERTIES LABELS "host;main")
 
-add_executable(
+refloat_add_cpp_test(
   refloat-cpp-main-lifecycle-tests
   "${REFLOAT_TEST_DIR}/cpp/main_lifecycle_test.cpp"
-)
-target_link_libraries(
-  refloat-cpp-main-lifecycle-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
+  cpp.main-lifecycle
+  LINK_LIBRARIES
     refloat_main_bridge
+  LABELS
+    "host;cpp;main;lifecycle"
 )
-add_dependencies(refloat-cpp-main-lifecycle-tests refloat_generated_conf)
-add_test(NAME cpp.main-lifecycle COMMAND refloat-cpp-main-lifecycle-tests)
-set_tests_properties(cpp.main-lifecycle PROPERTIES LABELS "host;cpp;main;lifecycle")
 
-add_executable(
+refloat_add_cpp_test(
   refloat-cpp-main-command-length-tests
   "${REFLOAT_TEST_DIR}/cpp/main_command_length_test.cpp"
-)
-target_link_libraries(
-  refloat-cpp-main-command-length-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
-    refloat_main_bridge
-)
-add_dependencies(refloat-cpp-main-command-length-tests refloat_generated_conf)
-add_test(NAME cpp.main-command-length COMMAND refloat-cpp-main-command-length-tests)
-set_tests_properties(
   cpp.main-command-length
-  PROPERTIES
-    LABELS "host;cpp;main;protocol"
-    WILL_FAIL TRUE
+  LINK_LIBRARIES
+    refloat_main_bridge
+  LABELS
+    "host;cpp;main;protocol"
+  WILL_FAIL
 )
 
-add_executable(
+refloat_add_cpp_test(
   refloat-cpp-main-protocol-tests
   "${REFLOAT_TEST_DIR}/cpp/main_alerts_lights_test.cpp"
-)
-target_link_libraries(
-  refloat-cpp-main-protocol-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
+  cpp.main-protocol
+  LINK_LIBRARIES
     refloat_main_bridge
+  LABELS
+    "host;cpp;main;protocol"
 )
-add_dependencies(refloat-cpp-main-protocol-tests refloat_generated_conf)
-add_test(NAME cpp.main-protocol COMMAND refloat-cpp-main-protocol-tests)
-set_tests_properties(cpp.main-protocol PROPERTIES LABELS "host;cpp;main;protocol")
 
-add_executable(
+refloat_add_cpp_test(
   refloat-cpp-main-all-data-tests
   "${REFLOAT_TEST_DIR}/cpp/main_all_data_test.cpp"
-)
-target_link_libraries(
-  refloat-cpp-main-all-data-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
-    refloat_main_bridge
-)
-add_dependencies(refloat-cpp-main-all-data-tests refloat_generated_conf)
-add_test(NAME cpp.main-all-data COMMAND refloat-cpp-main-all-data-tests)
-set_tests_properties(
   cpp.main-all-data
-  PROPERTIES
-    LABELS "host;cpp;main;protocol"
-    WILL_FAIL TRUE
+  LINK_LIBRARIES
+    refloat_main_bridge
+  LABELS
+    "host;cpp;main;protocol"
+  WILL_FAIL
 )
 
-add_executable(
+refloat_add_cpp_test(
   refloat-cpp-main-gnss-tests
   "${REFLOAT_TEST_DIR}/cpp/main_gnss_test.cpp"
-)
-target_link_libraries(
-  refloat-cpp-main-gnss-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
+  cpp.main-gnss
+  LINK_LIBRARIES
     refloat_main_bridge
+  LABELS
+    "host;cpp;main;gnss"
 )
-add_dependencies(refloat-cpp-main-gnss-tests refloat_generated_conf)
-add_test(NAME cpp.main-gnss COMMAND refloat-cpp-main-gnss-tests)
-set_tests_properties(cpp.main-gnss PROPERTIES LABELS "host;cpp;main;gnss")
 
-add_executable(
+refloat_add_cpp_test(
   refloat-cpp-main-gnss-missing-tests
   "${REFLOAT_TEST_DIR}/cpp/main_gnss_unavailable_test.cpp"
-)
-target_compile_definitions(refloat-cpp-main-gnss-missing-tests PRIVATE REFLOAT_GNSS_UNAVAILABLE_SCENARIO=1)
-target_link_libraries(
-  refloat-cpp-main-gnss-missing-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
-    refloat_main_bridge
-)
-add_dependencies(refloat-cpp-main-gnss-missing-tests refloat_generated_conf)
-add_test(NAME cpp.main-gnss-missing COMMAND refloat-cpp-main-gnss-missing-tests)
-set_tests_properties(
   cpp.main-gnss-missing
-  PROPERTIES
-    LABELS "host;cpp;main;gnss"
-    WILL_FAIL TRUE
+  LINK_LIBRARIES
+    refloat_main_bridge
+  LABELS
+    "host;cpp;main;gnss"
+  COMPILE_DEFINITIONS
+    REFLOAT_GNSS_UNAVAILABLE_SCENARIO=1
+  WILL_FAIL
 )
 
-add_executable(
+refloat_add_cpp_test(
   refloat-cpp-main-gnss-null-tests
   "${REFLOAT_TEST_DIR}/cpp/main_gnss_unavailable_test.cpp"
-)
-target_compile_definitions(refloat-cpp-main-gnss-null-tests PRIVATE REFLOAT_GNSS_UNAVAILABLE_SCENARIO=2)
-target_link_libraries(
-  refloat-cpp-main-gnss-null-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
-    refloat_main_bridge
-)
-add_dependencies(refloat-cpp-main-gnss-null-tests refloat_generated_conf)
-add_test(NAME cpp.main-gnss-null COMMAND refloat-cpp-main-gnss-null-tests)
-set_tests_properties(
   cpp.main-gnss-null
-  PROPERTIES
-    LABELS "host;cpp;main;gnss"
-    WILL_FAIL TRUE
+  LINK_LIBRARIES
+    refloat_main_bridge
+  LABELS
+    "host;cpp;main;gnss"
+  COMPILE_DEFINITIONS
+    REFLOAT_GNSS_UNAVAILABLE_SCENARIO=2
+  WILL_FAIL
 )
 
 add_library(refloat_cpp_circular_buffer STATIC "${REFLOAT_SRC_DIR}/lib/circular_buffer.c")
 target_link_libraries(refloat_cpp_circular_buffer PRIVATE refloat_host_c_options)
 
-add_executable(refloat-cpp-smoke-tests "${REFLOAT_TEST_DIR}/cpp/circular_buffer_smoke_test.cpp")
-target_link_libraries(
+refloat_add_cpp_test(
   refloat-cpp-smoke-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
+  "${REFLOAT_TEST_DIR}/cpp/circular_buffer_smoke_test.cpp"
+  cpp.circular-buffer-smoke
+  LINK_LIBRARIES
     refloat_cpp_circular_buffer
     refloat_led_driver_fake
+  LABELS
+    "host;cpp;circular-buffer"
 )
-add_test(NAME cpp.circular-buffer-smoke COMMAND refloat-cpp-smoke-tests)
-set_tests_properties(cpp.circular-buffer-smoke PROPERTIES LABELS "host;cpp;circular-buffer")
 
-add_executable(
+refloat_add_cpp_test(
   refloat-cpp-circular-buffer-tests
   "${REFLOAT_TEST_DIR}/cpp/circular_buffer_test.cpp"
-)
-target_link_libraries(
-  refloat-cpp-circular-buffer-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
+  cpp.circular-buffer
+  LINK_LIBRARIES
     refloat_cpp_circular_buffer
+  LABELS
+    "host;cpp;circular-buffer"
 )
-add_test(NAME cpp.circular-buffer COMMAND refloat-cpp-circular-buffer-tests)
-set_tests_properties(cpp.circular-buffer PROPERTIES LABELS "host;cpp;circular-buffer")
 
-add_executable(refloat-cpp-leds-tests "${REFLOAT_TEST_DIR}/cpp/leds_test.cpp")
-target_link_libraries(
+refloat_add_cpp_test(
   refloat-cpp-leds-tests
-  PRIVATE
-    refloat_host_cpp_options
-    Catch2::Catch2WithMain
+  "${REFLOAT_TEST_DIR}/cpp/leds_test.cpp"
+  cpp.leds
+  LINK_LIBRARIES
     refloat_host_common
     refloat_led_common
     refloat_vesc_fake
     refloat_led_driver_fake
+  LABELS
+    "host;cpp;leds"
 )
-add_test(NAME cpp.leds COMMAND refloat-cpp-leds-tests)
-set_tests_properties(cpp.leds PROPERTIES LABELS "host;cpp;leds")
 
-add_executable(
+refloat_add_cpp_test(
   refloat-generated-config-tests
   "${REFLOAT_TEST_DIR}/cpp/generated_config_parser_test.cpp"
-)
-target_link_libraries(
-  refloat-generated-config-tests
-  PRIVATE
-    refloat_host_cpp_options
+  cpp.generated-config
+  LINK_LIBRARIES
     refloat_conf_support
-    Catch2::Catch2WithMain
+  LABELS
+    "host;cpp;generated-config"
 )
-add_dependencies(refloat-generated-config-tests refloat_generated_conf)
-add_test(NAME cpp.generated-config COMMAND refloat-generated-config-tests)
-set_tests_properties(cpp.generated-config PROPERTIES LABELS "host;cpp;generated-config")
 
 add_custom_target(
   refloat_host_tests
