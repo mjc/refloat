@@ -34,6 +34,19 @@ jobs:
       - name: Run host C suites
         run: make -C tests check
 
+  host-cmake-tests:
+    name: Host CMake Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v25
+      - uses: rrbutani/use-nix-shell-action@v1
+        with:
+          flakes: nixpkgs#gcc, nixpkgs#gnumake, nixpkgs#cmake, nixpkgs#ninja, nixpkgs#catch2_3, github:lukash/vesc_tool-flake/release_6_06
+
+      - name: Run CMake workflow
+        run: cmake --workflow --preset host-debug
+
   qml-smoke:
     name: QML Behavior
     runs-on: ubuntu-24.04
@@ -57,6 +70,7 @@ jobs:
     needs:
       - format
       - host-c-tests
+      - host-cmake-tests
       - qml-smoke
     steps:
       - uses: actions/checkout@v4
