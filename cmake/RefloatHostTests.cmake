@@ -252,13 +252,18 @@ add_library(refloat_leds_main_fakes STATIC "${REFLOAT_TEST_DIR}/leds_main_fakes.
 target_link_libraries(refloat_leds_main_fakes PRIVATE refloat_host_c_options)
 
 add_executable(
-  refloat-migrated-c-tests
-  "${REFLOAT_TEST_DIR}/cpp/migrated_c_tests.cpp"
-  "${REFLOAT_TEST_DIR}/cpp/migrated_c_test_impl.cpp"
+  refloat-cpp-c-core-tests
+  "${REFLOAT_TEST_DIR}/cpp/c/bms_leds_data_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/c/filters_lcm_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/c/input_remote_imu_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/c/konami_haptic_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/c/motor_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/c/tilt_balance_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/c/time_and_smoothing_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/c/turn_reverse_alert_test.cpp"
 )
-set_source_files_properties("${REFLOAT_TEST_DIR}/cpp/migrated_c_test_impl.cpp" PROPERTIES LANGUAGE C)
 target_link_libraries(
-  refloat-migrated-c-tests
+  refloat-cpp-c-core-tests
   PRIVATE
     refloat_host_c_options
     refloat_host_cpp_options
@@ -267,15 +272,20 @@ target_link_libraries(
     refloat_vesc_fake
     refloat_host_test_fakes
 )
-add_dependencies(refloat-migrated-c-tests refloat_generated_conf)
+target_compile_options(
+  refloat-cpp-c-core-tests
+  PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:-Wno-missing-field-initializers>"
+)
+add_dependencies(refloat-cpp-c-core-tests refloat_generated_conf)
 catch_discover_tests(
-  refloat-migrated-c-tests
+  refloat-cpp-c-core-tests
   TEST_SPEC "~[red]"
   TEST_PREFIX "c."
   PROPERTIES LABELS host
 )
 catch_discover_tests(
-  refloat-migrated-c-tests
+  refloat-cpp-c-core-tests
   TEST_SPEC "[red]"
   TEST_PREFIX "red.c."
   PROPERTIES LABELS red
