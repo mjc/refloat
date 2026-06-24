@@ -3,6 +3,7 @@ include_guard(GLOBAL)
 find_package(Catch2 3 REQUIRED)
 find_package(Git REQUIRED)
 find_program(REFLOAT_MAKE_EXECUTABLE NAMES gmake make REQUIRED)
+include(Catch)
 
 set(REFLOAT_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 set(REFLOAT_SRC_DIR "${REFLOAT_ROOT}/src")
@@ -83,7 +84,7 @@ endif()
 add_library(refloat_host_c_options INTERFACE)
 target_link_libraries(refloat_host_c_options INTERFACE refloat_host_base)
 target_compile_features(refloat_host_c_options INTERFACE c_std_11)
-target_include_directories(refloat_host_c_options INTERFACE "${REFLOAT_SRC_DIR}")
+target_include_directories(refloat_host_c_options INTERFACE "$<$<COMPILE_LANGUAGE:C>:${REFLOAT_SRC_DIR}>")
 target_compile_options(
   refloat_host_c_options
   INTERFACE
@@ -114,27 +115,6 @@ target_compile_options(
     -Wextra
     "$<$<BOOL:${REFLOAT_STRICT_WARNINGS}>:-Werror>"
 )
-
-function(refloat_add_c_test target source test_name)
-  set(options WILL_FAIL)
-  set(oneValueArgs)
-  set(multiValueArgs LINK_LIBRARIES LABELS COMPILE_DEFINITIONS DEPENDS)
-  cmake_parse_arguments(REFLOAT_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-  add_executable(${target} ${source})
-  target_link_libraries(${target} PRIVATE refloat_host_c_options ${REFLOAT_TEST_LINK_LIBRARIES})
-  if(REFLOAT_TEST_COMPILE_DEFINITIONS)
-    target_compile_definitions(${target} PRIVATE ${REFLOAT_TEST_COMPILE_DEFINITIONS})
-  endif()
-  add_dependencies(${target} refloat_generated_conf ${REFLOAT_TEST_DEPENDS})
-  add_test(NAME ${test_name} COMMAND ${target})
-  if(REFLOAT_TEST_LABELS)
-    set_tests_properties(${test_name} PROPERTIES LABELS "${REFLOAT_TEST_LABELS}")
-  endif()
-  if(REFLOAT_TEST_WILL_FAIL)
-    set_tests_properties(${test_name} PROPERTIES WILL_FAIL TRUE)
-  endif()
-endfunction()
 
 function(refloat_add_cpp_test target source test_name)
   set(options WILL_FAIL)
@@ -274,16 +254,34 @@ target_link_libraries(refloat_led_driver_fake PRIVATE refloat_host_c_options)
 add_library(refloat_leds_main_fakes STATIC "${REFLOAT_TEST_DIR}/leds_main_fakes.c")
 target_link_libraries(refloat_leds_main_fakes PRIVATE refloat_host_c_options)
 
-refloat_add_c_test(
-  refloat-c-tests
-  "${REFLOAT_TEST_DIR}/c_tests.c"
-  c.host
-  LINK_LIBRARIES
+add_executable(
+  refloat-migrated-c-tests
+  "${REFLOAT_TEST_DIR}/cpp/migrated_c_tests.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/migrated_c_test_impl.cpp"
+)
+set_source_files_properties("${REFLOAT_TEST_DIR}/cpp/migrated_c_test_impl.cpp" PROPERTIES LANGUAGE C)
+target_link_libraries(
+  refloat-migrated-c-tests
+  PRIVATE
+    refloat_host_c_options
+    refloat_host_cpp_options
+    Catch2::Catch2WithMain
     refloat_host_common
     refloat_vesc_fake
     refloat_host_test_fakes
-  LABELS
-    "host;c"
+)
+add_dependencies(refloat-migrated-c-tests refloat_generated_conf)
+catch_discover_tests(
+  refloat-migrated-c-tests
+  TEST_SPEC "~[red]"
+  TEST_PREFIX "c."
+  PROPERTIES LABELS host
+)
+catch_discover_tests(
+  refloat-migrated-c-tests
+  TEST_SPEC "[red]"
+  TEST_PREFIX "red.c."
+  PROPERTIES LABELS red
 )
 
 add_library(refloat_main_bridge STATIC "${REFLOAT_TEST_DIR}/main_protocol_wrapper.c")
@@ -427,7 +425,7 @@ add_custom_target(
   refloat_host_tests
   DEPENDS
     refloat_generated_conf
-    refloat-c-tests
+    refloat-migrated-c-tests
     refloat-cpp-main-lifecycle-tests
     refloat-cpp-main-command-length-tests
     refloat-cpp-main-protocol-tests
