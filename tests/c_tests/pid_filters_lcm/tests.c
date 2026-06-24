@@ -42,13 +42,15 @@ static bool test_sma_growth_transition_edges(void) {
     return true;
 }
 
-static sigjmp_buf sma_allocation_failure_sigsegv_env;
+typedef struct {
+    SMA *sma;
+    float value;
+} SmaUpdateGuard;
 
-enum { TEST_SMA_SIGSEGV = 11 };
-
-static void catch_sma_allocation_failure_sigsegv(int signal_number) {
-    unused(signal_number);
-    siglongjmp(sma_allocation_failure_sigsegv_env, 1);
+static bool run_sma_update(void *ctx) {
+    SmaUpdateGuard *guard = ctx;
+    sma_update(guard->sma, guard->value);
+    return true;
 }
 
 static bool test_sma_allocation_failure_update(void) {
@@ -61,14 +63,8 @@ static bool test_sma_allocation_failure_update(void) {
     EXPECT_TRUE(sma.array == NULL);
     EXPECT_EQ_U32(sma.n, 0u);
 
-    SignalHandler previous_handler = signal(TEST_SMA_SIGSEGV, catch_sma_allocation_failure_sigsegv);
-    if (sigsetjmp(sma_allocation_failure_sigsegv_env, 1) != 0) {
-        signal(TEST_SMA_SIGSEGV, previous_handler);
-        return false;
-    }
-
-    sma_update(&sma, 12.0f);
-    signal(TEST_SMA_SIGSEGV, previous_handler);
+    SmaUpdateGuard guard = {.sma = &sma, .value = 12.0f};
+    EXPECT_TRUE(test_expect_no_signal(SIGSEGV, run_sma_update, &guard));
 
     EXPECT_FLOAT_NEAR(sma.value, 0.0f);
     EXPECT_EQ_U32(sma.idx, 0u);
@@ -249,30 +245,25 @@ static bool test_lcm_init_configure_and_runtime_brightness(void) {
     return true;
 }
 
-static sigjmp_buf lcm_configure_sigsegv_env;
+typedef struct {
+    LcmData *lcm;
+    Leds *leds;
+} LcmConfigureGuard;
 
-enum { TEST_SIGSEGV = 11 };
-
-static void catch_lcm_configure_sigsegv(int signal_number) {
-    unused(signal_number);
-    siglongjmp(lcm_configure_sigsegv_env, 1);
+static bool run_lcm_configure(void *ctx) {
+    LcmConfigureGuard *guard = ctx;
+    lcm_configure(guard->lcm, guard->leds);
+    return true;
 }
 
 static bool test_lcm_configure_requires_initialized_led_config(void) {
-    SignalHandler previous_handler = signal(TEST_SIGSEGV, catch_lcm_configure_sigsegv);
-
-    if (sigsetjmp(lcm_configure_sigsegv_env, 1) != 0) {
-        signal(TEST_SIGSEGV, previous_handler);
-        return false;
-    }
-
     LcmData lcm = {0};
     lcm.enabled = true;
     Leds leds = {0};
     lcm_fakes_set_runtime_status(true, false);
 
-    lcm_configure(&lcm, &leds);
-    signal(TEST_SIGSEGV, previous_handler);
+    LcmConfigureGuard guard = {.lcm = &lcm, .leds = &leds};
+    EXPECT_TRUE(test_expect_no_signal(SIGSEGV, run_lcm_configure, &guard));
 
     EXPECT_EQ_U32(lcm.brightness, 0u);
     EXPECT_EQ_U32(lcm.brightness_idle, 0u);
@@ -406,4 +397,3 @@ static bool test_lcm_battery_response_nonfinite_values_are_stable(void) {
 
     return true;
 }
-

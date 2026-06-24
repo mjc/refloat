@@ -34,16 +34,12 @@
 #include "time.h"
 
 #include <math.h>
-#include <setjmp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "test_runner.h"
-
-typedef void (*SignalHandler)(int);
-SignalHandler signal(int signal_number, SignalHandler handler);
 
 typedef struct {
     uint8_t lo;

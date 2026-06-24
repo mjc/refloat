@@ -134,13 +134,16 @@ static bool test_motor_control_parking_and_tone_edges(void) {
     return true;
 }
 
-static sigjmp_buf motor_control_zero_tone_frequency_sigfpe_env;
+typedef struct {
+    MotorControl *mc;
+    uint16_t frequency;
+    float intensity;
+} MotorControlToneGuard;
 
-enum { TEST_SIGFPE = 8 };
-
-static void catch_motor_control_zero_tone_frequency_sigfpe(int signal_number) {
-    unused(signal_number);
-    siglongjmp(motor_control_zero_tone_frequency_sigfpe_env, 1);
+static bool run_motor_control_play_tone(void *ctx) {
+    MotorControlToneGuard *guard = ctx;
+    motor_control_play_tone(guard->mc, guard->frequency, guard->intensity);
+    return true;
 }
 
 static bool test_motor_control_zero_tone_frequency(void) {
@@ -154,14 +157,8 @@ static bool test_motor_control_zero_tone_frequency(void) {
     };
     motor_control_configure(&mc, &cfg, 1000u);
 
-    SignalHandler previous_handler = signal(TEST_SIGFPE, catch_motor_control_zero_tone_frequency_sigfpe);
-    if (sigsetjmp(motor_control_zero_tone_frequency_sigfpe_env, 1) != 0) {
-        signal(TEST_SIGFPE, previous_handler);
-        return false;
-    }
-
-    motor_control_play_tone(&mc, 0u, 1.0f);
-    signal(TEST_SIGFPE, previous_handler);
+    MotorControlToneGuard guard = {.mc = &mc, .frequency = 0u, .intensity = 1.0f};
+    EXPECT_TRUE(test_expect_no_signal(SIGFPE, run_motor_control_play_tone, &guard));
 
     EXPECT_EQ_U32(mc.tone_ticks, 0u);
     EXPECT_EQ_U32(mc.tone_counter, 0u);

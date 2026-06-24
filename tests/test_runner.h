@@ -4,10 +4,22 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <math.h>
+#include <setjmp.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+
+#ifndef SIGFPE
+#define SIGFPE 8
+#endif
+
+#ifndef SIGSEGV
+#define SIGSEGV 11
+#endif
+
+typedef void (*TestSignalHandler)(int);
+TestSignalHandler signal(int signal_number, TestSignalHandler handler);
 
 #ifndef TEST_FLOAT_EPS
 #define TEST_FLOAT_EPS 1e-4f
@@ -183,6 +195,40 @@ static inline void test_report_float_failure(
 #define XCHECK(expr) XEXPECT_TRUE(expr)
 #define XCHECK_FLOAT_NEAR(actual, expected) XEXPECT_FLOAT_NEAR(actual, expected)
 #define XCHECK_U32(actual, expected) XEXPECT_EQ_U32(actual, expected)
+
+// One in-flight guard per test binary; these host tests run serially.
+typedef bool (*TestSignalCallback)(void *ctx);
+
+typedef struct {
+    int signo;
+    sigjmp_buf env;
+} TestSignalGuard;
+
+static TestSignalGuard *test_signal_guard_current = NULL;
+
+static inline void test_signal_guard_handler(int signal_number) {
+    TestSignalGuard *guard = test_signal_guard_current;
+    if (guard != NULL && signal_number == guard->signo) {
+        siglongjmp(guard->env, 1);
+    }
+}
+
+static inline bool test_expect_no_signal(int signo, TestSignalCallback fn, void *ctx) {
+    TestSignalGuard guard = {.signo = signo};
+    void (*previous_handler)(int) = signal(signo, test_signal_guard_handler);
+    bool ok = true;
+
+    test_signal_guard_current = &guard;
+    if (sigsetjmp(guard.env, 1) == 0) {
+        ok = fn(ctx);
+    } else {
+        ok = false;
+    }
+    signal(signo, previous_handler);
+    test_signal_guard_current = NULL;
+
+    return ok;
+}
 
 static inline int run_test_case(const TestCase *test_case, size_t *passes, size_t *xfails, size_t *failures) {
     bool ok = test_case->fn();

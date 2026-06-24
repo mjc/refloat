@@ -766,13 +766,15 @@ static bool test_data_recorder_status_and_data_serialization(void) {
     return true;
 }
 
-static sigjmp_buf data_recorder_tiny_buffer_sigfpe_env;
+typedef struct {
+    DataRecord *dr;
+    uint32_t sample_rate;
+} DataRecorderTinyBufferGuard;
 
-enum { DATA_RECORDER_TINY_BUFFER_SIGFPE = 8 };
-
-static void catch_data_recorder_tiny_buffer_sigfpe(int signal_number) {
-    unused(signal_number);
-    siglongjmp(data_recorder_tiny_buffer_sigfpe_env, 1);
+static bool run_data_recorder_init(void *ctx) {
+    DataRecorderTinyBufferGuard *guard = ctx;
+    data_recorder_init(guard->dr, guard->sample_rate);
+    return true;
 }
 
 static bool test_data_recorder_rejects_tiny_backing_buffer(void) {
@@ -782,16 +784,9 @@ static bool test_data_recorder_rejects_tiny_backing_buffer(void) {
     uint8_t tiny_storage[sizeof(Sample) - 1] = {0};
     vesc_if_fake_set_data_buffer(0xcafe1011u, tiny_storage, sizeof(tiny_storage));
 
-    SignalHandler previous_handler =
-        signal(DATA_RECORDER_TINY_BUFFER_SIGFPE, catch_data_recorder_tiny_buffer_sigfpe);
-    if (sigsetjmp(data_recorder_tiny_buffer_sigfpe_env, 1) != 0) {
-        signal(DATA_RECORDER_TINY_BUFFER_SIGFPE, previous_handler);
-        return false;
-    }
+    DataRecorderTinyBufferGuard guard = {.dr = &dr, .sample_rate = 100u};
+    EXPECT_TRUE(test_expect_no_signal(SIGFPE, run_data_recorder_init, &guard));
 
-    data_recorder_init(&dr, 100u);
-
-    signal(DATA_RECORDER_TINY_BUFFER_SIGFPE, previous_handler);
     EXPECT_TRUE(!data_recorder_has_capability(&dr));
     EXPECT_TRUE(!dr.recording);
     EXPECT_TRUE(dr.sample_count == 0);

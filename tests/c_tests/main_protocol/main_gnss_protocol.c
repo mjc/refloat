@@ -28,25 +28,20 @@ static double buffer_get_float64_be(const uint8_t *buffer, int32_t *index) {
     return un.d;
 }
 
-static sigjmp_buf main_gnss_optional_env;
+typedef struct {
+    uint8_t *request;
+    size_t request_len;
+} MainGnssInvokeGuard;
 
-enum { MAIN_GNSS_SIGSEGV = 11 };
-
-static void catch_main_gnss_optional_signal(int signal_number) {
-    (void) signal_number;
-    siglongjmp(main_gnss_optional_env, 1);
+static bool run_main_gnss_invoke(void *ctx) {
+    MainGnssInvokeGuard *guard = ctx;
+    vesc_if_fake_invoke_app_data_handler(guard->request, guard->request_len);
+    return true;
 }
 
 static bool main_gnss_invoke_without_signal(uint8_t *request, size_t request_len) {
-    SignalHandler previous_sigsegv = signal(MAIN_GNSS_SIGSEGV, catch_main_gnss_optional_signal);
-    bool ok = true;
-    if (sigsetjmp(main_gnss_optional_env, 1) == 0) {
-        vesc_if_fake_invoke_app_data_handler(request, request_len);
-    } else {
-        ok = false;
-    }
-    signal(MAIN_GNSS_SIGSEGV, previous_sigsegv);
-    return ok;
+    MainGnssInvokeGuard guard = {.request = request, .request_len = request_len};
+    return test_expect_no_signal(SIGSEGV, run_main_gnss_invoke, &guard);
 }
 
 static bool main_gnss_start(lib_info *info, Data **data) {

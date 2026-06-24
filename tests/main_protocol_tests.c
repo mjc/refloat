@@ -4,7 +4,6 @@
 #include "vesc_if_fake.h"
 
 #include <math.h>
-#include <setjmp.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -17,9 +16,6 @@
 #ifndef MAP_ANONYMOUS
 #define MAP_ANONYMOUS MAP_ANON
 #endif
-
-typedef void (*SignalHandler)(int);
-SignalHandler signal(int signal_number, SignalHandler handler);
 void refloat_main_fatal_error_terminate(void);
 
 #include "c_tests/main_protocol/main_gnss_protocol.c"
