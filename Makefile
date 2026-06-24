@@ -35,7 +35,10 @@ test-gated-package: clean-package-artifacts check $(PACKAGE_ARTIFACT)
 
 check:
 	$(MAKE) -C tests check
+	$(MAKE) -C tests check-python
+	$(MAKE) -C tests check-qml
 	$(MAKE) -C tests check-qml-behavior
+	$(MAKE) -C tests check-lisp
 
 check-vesc-tool:
 	@if ! command -v "$(VESC_TOOL)" >/dev/null 2>&1 && [ ! -x "$(VESC_TOOL)" ]; then \
