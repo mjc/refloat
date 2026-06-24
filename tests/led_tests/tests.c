@@ -20,8 +20,6 @@ size_t led_driver_fake_setup_calls(void);
 size_t led_driver_fake_paint_calls(void);
 size_t led_driver_fake_destroy_calls(void);
 
-static bool current_test_is_xfail = false;
-
 static LedBar solid_bar(float brightness, LedColor color) {
     LedBar bar = {
         .brightness = brightness,

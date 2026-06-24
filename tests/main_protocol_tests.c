@@ -18,8 +18,6 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-static bool current_test_is_xfail = false;
-
 typedef void (*SignalHandler)(int);
 SignalHandler signal(int signal_number, SignalHandler handler);
 void refloat_main_fatal_error_terminate(void);

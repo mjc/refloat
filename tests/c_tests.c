@@ -45,8 +45,6 @@
 typedef void (*SignalHandler)(int);
 SignalHandler signal(int signal_number, SignalHandler handler);
 
-static bool current_test_is_xfail = false;
-
 typedef struct {
     uint8_t lo;
     uint8_t hi;

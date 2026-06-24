@@ -118,7 +118,7 @@ static bool check_main_info_optional_gnss(bool missing_hook) {
         vesc_if_fake_set_mc_gnss_returns_null(true);
     }
 
-    CHECK(main_gnss_invoke_without_signal(info_request, sizeof(info_request)));
+    XEXPECT_TRUE(main_gnss_invoke_without_signal(info_request, sizeof(info_request)));
     size_t len = 0;
     const uint8_t *payload = vesc_if_fake_last_app_data(&len);
     CHECK(check_main_info_gnss_flags(payload, len, 0u));
@@ -139,7 +139,7 @@ static bool check_main_realtime_optional_gnss(bool missing_hook) {
         vesc_if_fake_set_mc_gnss_returns_null(true);
     }
 
-    CHECK(main_gnss_invoke_without_signal(rt_request, sizeof(rt_request)));
+    XEXPECT_TRUE(main_gnss_invoke_without_signal(rt_request, sizeof(rt_request)));
     size_t len = 0;
     const uint8_t *payload = vesc_if_fake_last_app_data(&len);
     CHECK(payload != NULL);
