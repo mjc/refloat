@@ -117,7 +117,7 @@ target_compile_options(
 )
 
 function(refloat_add_cpp_test target source test_name)
-  set(options WILL_FAIL)
+  set(options)
   set(oneValueArgs)
   set(multiValueArgs LINK_LIBRARIES LABELS COMPILE_DEFINITIONS DEPENDS)
   cmake_parse_arguments(REFLOAT_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -137,9 +137,6 @@ function(refloat_add_cpp_test target source test_name)
   add_test(NAME ${test_name} COMMAND ${target})
   if(REFLOAT_TEST_LABELS)
     set_tests_properties(${test_name} PROPERTIES LABELS "${REFLOAT_TEST_LABELS}")
-  endif()
-  if(REFLOAT_TEST_WILL_FAIL)
-    set_tests_properties(${test_name} PROPERTIES WILL_FAIL TRUE)
   endif()
 endfunction()
 
@@ -313,8 +310,7 @@ refloat_add_cpp_test(
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
-    "host;cpp;main;protocol"
-  WILL_FAIL
+    "red;cpp;main;protocol"
 )
 
 refloat_add_cpp_test(
@@ -334,8 +330,7 @@ refloat_add_cpp_test(
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
-    "host;cpp;main;protocol"
-  WILL_FAIL
+    "red;cpp;main;protocol"
 )
 
 refloat_add_cpp_test(
@@ -355,10 +350,9 @@ refloat_add_cpp_test(
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
-    "host;cpp;main;gnss"
+    "red;cpp;main;gnss"
   COMPILE_DEFINITIONS
     REFLOAT_GNSS_UNAVAILABLE_SCENARIO=1
-  WILL_FAIL
 )
 
 refloat_add_cpp_test(
@@ -368,10 +362,9 @@ refloat_add_cpp_test(
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
-    "host;cpp;main;gnss"
+    "red;cpp;main;gnss"
   COMPILE_DEFINITIONS
     REFLOAT_GNSS_UNAVAILABLE_SCENARIO=2
-  WILL_FAIL
 )
 
 add_library(refloat_cpp_circular_buffer STATIC "${REFLOAT_SRC_DIR}/lib/circular_buffer.c")

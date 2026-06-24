@@ -43,7 +43,7 @@ static void prepare_main_protocol(Data **data) {
 
 #if REFLOAT_GNSS_UNAVAILABLE_SCENARIO == 1
 
-TEST_CASE("main info handles optional gnss unavailable", "[main][gnss][xfail]") {
+TEST_CASE("main info handles optional gnss unavailable", "[main][gnss][red]") {
     Data *data = nullptr;
     prepare_main_protocol(&data);
 
@@ -63,7 +63,7 @@ TEST_CASE("main info handles optional gnss unavailable", "[main][gnss][xfail]") 
 
 #elif REFLOAT_GNSS_UNAVAILABLE_SCENARIO == 2
 
-TEST_CASE("main realtime handles optional gnss unavailable", "[main][gnss][xfail]") {
+TEST_CASE("main realtime handles optional gnss unavailable", "[main][gnss][red]") {
     Data *data = nullptr;
     prepare_main_protocol(&data);
 
