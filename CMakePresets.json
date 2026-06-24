@@ -2,7 +2,7 @@
   "version": 6,
   "configurePresets": [
     {
-      "name": "host-debug-base",
+      "name": "host-base",
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
@@ -14,30 +14,22 @@
       }
     },
     {
-      "name": "host-debug",
-      "displayName": "Host Debug",
-      "inherits": "host-debug-base"
+      "name": "host",
+      "displayName": "Host Tests",
+      "inherits": "host-base"
     },
     {
-      "name": "host-debug-package",
-      "displayName": "Host Debug With Package Delegation",
-      "inherits": "host-debug-base",
+      "name": "package",
+      "displayName": "Package Build",
+      "inherits": "host-base",
       "cacheVariables": {
         "REFLOAT_BUILD_PACKAGE": "ON"
       }
     },
     {
-      "name": "host-debug-package-only",
-      "displayName": "Host Debug Package Only",
-      "inherits": "host-debug-base",
-      "cacheVariables": {
-        "REFLOAT_BUILD_PACKAGE": "ON"
-      }
-    },
-    {
-      "name": "host-debug-coverage",
-      "displayName": "Host Debug With Coverage",
-      "inherits": "host-debug-base",
+      "name": "coverage",
+      "displayName": "Host Coverage",
+      "inherits": "host-base",
       "cacheVariables": {
         "REFLOAT_ENABLE_COVERAGE": "ON"
       }
@@ -45,46 +37,56 @@
   ],
   "buildPresets": [
     {
-      "name": "host-debug",
-      "configurePreset": "host-debug"
+      "name": "host",
+      "configurePreset": "host"
     },
     {
-      "name": "host-debug-package",
-      "configurePreset": "host-debug-package",
+      "name": "package",
+      "configurePreset": "package",
       "targets": [
-        "refloat-package-only"
+        "refloat-package"
       ]
     },
     {
-      "name": "host-debug-package-only",
-      "configurePreset": "host-debug-package-only",
-      "targets": [
-        "refloat-package-only"
-      ]
-    },
-    {
-      "name": "host-debug-package-lib",
-      "configurePreset": "host-debug-package",
+      "name": "package-lib",
+      "configurePreset": "package",
       "targets": [
         "refloat-package-lib"
       ]
     },
     {
-      "name": "host-debug-coverage",
-      "configurePreset": "host-debug-coverage"
+      "name": "coverage",
+      "configurePreset": "coverage"
     }
   ],
   "testPresets": [
     {
-      "name": "host-debug",
-      "configurePreset": "host-debug",
+      "name": "host",
+      "configurePreset": "host",
+      "filter": {
+        "include": {
+          "label": "host"
+        }
+      },
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "host-debug-coverage",
-      "configurePreset": "host-debug-coverage",
+      "name": "package",
+      "configurePreset": "package",
+      "filter": {
+        "include": {
+          "label": "package"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
       "output": {
         "outputOnFailure": true
       }
@@ -92,80 +94,70 @@
   ],
   "workflowPresets": [
     {
-      "name": "host-debug",
-      "displayName": "Host Debug Workflow",
+      "name": "host",
+      "displayName": "Host Test Workflow",
       "steps": [
         {
           "type": "configure",
-          "name": "host-debug"
+          "name": "host"
         },
         {
           "type": "build",
-          "name": "host-debug"
+          "name": "host"
         },
         {
           "type": "test",
-          "name": "host-debug"
+          "name": "host"
         }
       ]
     },
     {
-      "name": "host-debug-package",
-      "displayName": "Host Debug Package Workflow",
+      "name": "package",
+      "displayName": "Package Workflow",
       "steps": [
         {
           "type": "configure",
-          "name": "host-debug-package"
+          "name": "package"
         },
         {
           "type": "build",
-          "name": "host-debug-package"
-        }
-      ]
-    },
-    {
-      "name": "host-debug-package-only",
-      "displayName": "Host Debug Package Only Workflow",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "host-debug-package-only"
-        },
-        {
-          "type": "build",
-          "name": "host-debug-package-only"
-        }
-      ]
-    },
-    {
-      "name": "host-debug-package-lib",
-      "displayName": "Host Debug Package Lib Workflow",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "host-debug-package"
-        },
-        {
-          "type": "build",
-          "name": "host-debug-package-lib"
-        }
-      ]
-    },
-    {
-      "name": "host-debug-coverage",
-      "displayName": "Host Debug Coverage Workflow",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "host-debug-coverage"
-        },
-        {
-          "type": "build",
-          "name": "host-debug-coverage"
+          "name": "package"
         },
         {
           "type": "test",
-          "name": "host-debug-coverage"
+          "name": "package"
+        }
+      ]
+    },
+    {
+      "name": "package-lib",
+      "displayName": "Package Lib Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "package"
+        },
+        {
+          "type": "build",
+          "name": "package-lib"
+        }
+      ]
+    },
+    {
+      "name": "coverage",
+      "displayName": "Coverage Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "coverage"
+        },
+        {
+          "type": "build",
+          "name": "coverage"
+        },
+        {
+          "type": "test",
+          "name": "coverage"
         }
       ]
     }

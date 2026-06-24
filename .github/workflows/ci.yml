@@ -29,44 +29,114 @@ jobs:
       - uses: cachix/install-nix-action@v25
       - uses: rrbutani/use-nix-shell-action@v1
         with:
-          flakes: nixpkgs#gcc, nixpkgs#gnumake, nixpkgs#cmake, nixpkgs#ninja, nixpkgs#catch2_3, github:lukash/vesc_tool-flake/release_6_06
+          flakes: nixpkgs#gcc, nixpkgs#cmake, nixpkgs#ninja, nixpkgs#catch2_3, github:lukash/vesc_tool-flake/release_6_06
 
       - name: Configure host tests
-        run: cmake --preset host-debug
+        run: cmake --preset host
 
       - name: Build host tests
-        run: cmake --build --preset host-debug
+        run: cmake --build --preset host
 
       - name: Run host tests
-        run: ctest --preset host-debug --output-on-failure
-
-  qml-smoke:
-    name: QML Behavior
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v25
-      - uses: rrbutani/use-nix-shell-action@v1
-        with:
-          flakes: nixpkgs#gnumake, nixpkgs#qt6.qtdeclarative
-
-      - name: Run QML smoke tests
-        run: |
-          qt_bin="$(dirname "$(command -v qmllint)")"
-          qt_root="$(dirname "$qt_bin")"
-          export PATH="$qt_root/libexec:$PATH"
-          make -C tests check-qml-behavior
+        run: ctest --preset host --output-on-failure
 
   build:
     name: Build Package
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-24.04
     needs:
       - format
       - host-tests
-      - qml-smoke
     steps:
       - uses: actions/checkout@v4
-      - name: Build Package
-        uses: ./.github/actions/build
+      - uses: cachix/install-nix-action@v25
+      - uses: cachix/cachix-action@v14
         with:
-          cache-auth-token: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          name: refloat
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - uses: rrbutani/use-nix-shell-action@v1
+        with:
+          flakes: nixpkgs/nixos-24.11#gcc-arm-embedded-13, nixpkgs#cmake, nixpkgs#ninja, nixpkgs#gcc, nixpkgs#catch2_3, nixpkgs#qt6.qtdeclarative, github:lukash/vesc_tool-flake/release_6_06
+
+      - name: Build package
+        run: cmake --workflow --preset package
+
+  create-release:
+    name: Create Release
+    if: ${{ startsWith(github.ref, 'refs/tags/') && (startsWith(github.ref_name, 'v') || contains(github.ref_name, '-preview')) }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    needs:
+      - format
+      - host-tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@v25
+      - uses: cachix/cachix-action@v14
+        with:
+          name: refloat
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - uses: rrbutani/use-nix-shell-action@v1
+        with:
+          flakes: nixpkgs/nixos-24.11#gcc-arm-embedded-13, nixpkgs#cmake, nixpkgs#ninja, nixpkgs#gcc, nixpkgs#catch2_3, nixpkgs#qt6.qtdeclarative, github:lukash/vesc_tool-flake/release_6_06
+
+      - name: Extract version
+        run: |
+          TAG="${{github.ref_name}}"
+          if [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${TAG}" >> $GITHUB_ENV
+          fi
+          if [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "PRERELEASE=false" >> $GITHUB_ENV
+          else
+            echo "PRERELEASE=true" >> $GITHUB_ENV
+          fi
+
+      - name: Check tag matches version
+        run: |
+          VER="$(cat version)"
+          if [ "${{env.VERSION}}" != "$VER" ]; then
+            echo "Error: Tag version (${{env.VERSION}}) doesn't match version file ($VER)."
+            exit 1
+          fi
+
+      - name: Build package
+        run: cmake --workflow --preset package
+
+      - name: Extract config signature
+        run: sed -n 's/^#define .\+_SIGNATURE\W\+\([0-9]*\)/\1/p' src/conf/confparser.h > config_signature.txt
+
+      - name: Rename package files
+        run: |
+          mv refloat.vescpkg refloat-${{env.VERSION}}.vescpkg
+          mv src/package_lib.elf refloat-${{env.VERSION}}.elf
+
+      - name: Install changelog dependencies
+        run: sudo apt-get install python3-git
+
+      - name: Generate release notes
+        run: |
+          if [[ "${{env.PRERELEASE}}" == "true" ]]; then
+            echo "**WARNING: This is a test version of the package. Bugs may be present.**" > release_notes.md
+            echo "" >> release_notes.md
+          fi
+          echo "**Use at your own risk!!!**" >> release_notes.md
+          echo "" >> release_notes.md
+
+          python changelog.py >> release_notes.md
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{github.ref}}
+          name: Refloat ${{env.VERSION}}
+          draft: true
+          artifacts: "refloat-${{env.VERSION}}.vescpkg,refloat-${{env.VERSION}}.elf,config_signature.txt"
+          bodyFile: "release_notes.md"
+          prerelease: ${{env.PRERELEASE}}
+          allowUpdates: true

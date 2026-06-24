@@ -2,7 +2,7 @@ include_guard(GLOBAL)
 
 find_package(Catch2 3 REQUIRED)
 find_package(Git REQUIRED)
-find_program(REFLOAT_MAKE_EXECUTABLE NAMES gmake make REQUIRED)
+find_program(REFLOAT_VESC_TOOL_EXECUTABLE NAMES vesc_tool REQUIRED)
 include(Catch)
 
 set(REFLOAT_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
@@ -108,6 +108,7 @@ target_compile_options(
     "$<$<COMPILE_LANGUAGE:CXX>:-iquote>"
     "$<$<COMPILE_LANGUAGE:CXX>:${REFLOAT_SRC_DIR}>"
 )
+target_include_directories(refloat_host_cpp_options INTERFACE "${REFLOAT_TEST_DIR}/cpp/support")
 target_compile_options(
   refloat_host_cpp_options
   INTERFACE
@@ -142,7 +143,13 @@ endfunction()
 
 add_custom_command(
   OUTPUT ${REFLOAT_GENERATED_CONF_OUTPUTS}
-  COMMAND "${REFLOAT_MAKE_EXECUTABLE}" -C tests generated_conf
+  COMMAND
+    "${CMAKE_COMMAND}"
+    -DREFLOAT_ROOT=${REFLOAT_ROOT}
+    -DREFLOAT_SRC_DIR=${REFLOAT_SRC_DIR}
+    -DVESC_TOOL_EXECUTABLE=${REFLOAT_VESC_TOOL_EXECUTABLE}
+    -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+    -P "${CMAKE_CURRENT_LIST_DIR}/RefloatGeneratePackageConf.cmake"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${REFLOAT_GENERATED_CONF_DIR}"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
     "${REFLOAT_SRC_DIR}/conf/conf_default.h"
@@ -164,7 +171,7 @@ add_custom_command(
     "${REFLOAT_GENERATED_CONF_DIR}/confxml.c"
   WORKING_DIRECTORY "${REFLOAT_ROOT}"
   DEPENDS ${REFLOAT_GENERATED_CONF_INPUTS}
-  COMMENT "Generating Refloat config parser sources through the canonical Make target"
+  COMMENT "Generating Refloat config parser sources"
   VERBATIM
 )
 add_custom_target(refloat_generated_conf DEPENDS ${REFLOAT_GENERATED_CONF_OUTPUTS})
@@ -252,18 +259,18 @@ add_library(refloat_leds_main_fakes STATIC "${REFLOAT_TEST_DIR}/leds_main_fakes.
 target_link_libraries(refloat_leds_main_fakes PRIVATE refloat_host_c_options)
 
 add_executable(
-  refloat-cpp-c-core-tests
-  "${REFLOAT_TEST_DIR}/cpp/c/bms_leds_data_test.cpp"
-  "${REFLOAT_TEST_DIR}/cpp/c/filters_lcm_test.cpp"
-  "${REFLOAT_TEST_DIR}/cpp/c/input_remote_imu_test.cpp"
-  "${REFLOAT_TEST_DIR}/cpp/c/konami_haptic_test.cpp"
-  "${REFLOAT_TEST_DIR}/cpp/c/motor_test.cpp"
-  "${REFLOAT_TEST_DIR}/cpp/c/tilt_balance_test.cpp"
-  "${REFLOAT_TEST_DIR}/cpp/c/time_and_smoothing_test.cpp"
-  "${REFLOAT_TEST_DIR}/cpp/c/turn_reverse_alert_test.cpp"
+  refloat-firmware-tests
+  "${REFLOAT_TEST_DIR}/cpp/firmware/bms_leds_data_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/firmware/filters_lcm_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/firmware/input_remote_imu_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/firmware/konami_haptic_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/firmware/motor_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/firmware/tilt_balance_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/firmware/time_and_smoothing_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/firmware/turn_reverse_alert_test.cpp"
 )
 target_link_libraries(
-  refloat-cpp-c-core-tests
+  refloat-firmware-tests
   PRIVATE
     refloat_host_c_options
     refloat_host_cpp_options
@@ -273,22 +280,22 @@ target_link_libraries(
     refloat_host_test_fakes
 )
 target_compile_options(
-  refloat-cpp-c-core-tests
+  refloat-firmware-tests
   PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:-Wno-missing-field-initializers>"
 )
-add_dependencies(refloat-cpp-c-core-tests refloat_generated_conf)
+add_dependencies(refloat-firmware-tests refloat_generated_conf)
 catch_discover_tests(
-  refloat-cpp-c-core-tests
+  refloat-firmware-tests
   TEST_SPEC "~[red]"
-  TEST_PREFIX "c."
-  PROPERTIES LABELS host
+  TEST_PREFIX "firmware."
+  PROPERTIES LABELS "host;cpp;firmware"
 )
 catch_discover_tests(
-  refloat-cpp-c-core-tests
+  refloat-firmware-tests
   TEST_SPEC "[red]"
-  TEST_PREFIX "red.c."
-  PROPERTIES LABELS red
+  TEST_PREFIX "red.firmware."
+  PROPERTIES LABELS "red;cpp;firmware"
 )
 
 add_library(refloat_main_bridge STATIC "${REFLOAT_TEST_DIR}/main_protocol_wrapper.c")
@@ -305,7 +312,7 @@ add_dependencies(refloat_main_bridge refloat_generated_conf)
 
 refloat_add_cpp_test(
   refloat-cpp-main-lifecycle-tests
-  "${REFLOAT_TEST_DIR}/cpp/main_lifecycle_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/main/main_lifecycle_test.cpp"
   cpp.main-lifecycle
   LINK_LIBRARIES
     refloat_main_bridge
@@ -315,7 +322,7 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-command-length-tests
-  "${REFLOAT_TEST_DIR}/cpp/main_command_length_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/main/main_command_length_test.cpp"
   cpp.main-command-length
   LINK_LIBRARIES
     refloat_main_bridge
@@ -325,7 +332,7 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-protocol-tests
-  "${REFLOAT_TEST_DIR}/cpp/main_alerts_lights_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/main/main_alerts_lights_test.cpp"
   cpp.main-protocol
   LINK_LIBRARIES
     refloat_main_bridge
@@ -335,7 +342,7 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-all-data-tests
-  "${REFLOAT_TEST_DIR}/cpp/main_all_data_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/main/main_all_data_test.cpp"
   cpp.main-all-data
   LINK_LIBRARIES
     refloat_main_bridge
@@ -345,7 +352,7 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-gnss-tests
-  "${REFLOAT_TEST_DIR}/cpp/main_gnss_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_test.cpp"
   cpp.main-gnss
   LINK_LIBRARIES
     refloat_main_bridge
@@ -355,7 +362,7 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-gnss-missing-tests
-  "${REFLOAT_TEST_DIR}/cpp/main_gnss_unavailable_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_unavailable_test.cpp"
   cpp.main-gnss-missing
   LINK_LIBRARIES
     refloat_main_bridge
@@ -367,7 +374,7 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-gnss-null-tests
-  "${REFLOAT_TEST_DIR}/cpp/main_gnss_unavailable_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_unavailable_test.cpp"
   cpp.main-gnss-null
   LINK_LIBRARIES
     refloat_main_bridge
@@ -381,9 +388,9 @@ add_library(refloat_cpp_circular_buffer STATIC "${REFLOAT_SRC_DIR}/lib/circular_
 target_link_libraries(refloat_cpp_circular_buffer PRIVATE refloat_host_c_options)
 
 refloat_add_cpp_test(
-  refloat-cpp-smoke-tests
-  "${REFLOAT_TEST_DIR}/cpp/circular_buffer_smoke_test.cpp"
-  cpp.circular-buffer-smoke
+  refloat-cpp-circular-buffer-tests
+  "${REFLOAT_TEST_DIR}/cpp/core/circular_buffer_test.cpp"
+  cpp.circular-buffer
   LINK_LIBRARIES
     refloat_cpp_circular_buffer
     refloat_led_driver_fake
@@ -392,18 +399,8 @@ refloat_add_cpp_test(
 )
 
 refloat_add_cpp_test(
-  refloat-cpp-circular-buffer-tests
-  "${REFLOAT_TEST_DIR}/cpp/circular_buffer_test.cpp"
-  cpp.circular-buffer
-  LINK_LIBRARIES
-    refloat_cpp_circular_buffer
-  LABELS
-    "host;cpp;circular-buffer"
-)
-
-refloat_add_cpp_test(
   refloat-cpp-leds-tests
-  "${REFLOAT_TEST_DIR}/cpp/leds_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/leds/leds_test.cpp"
   cpp.leds
   LINK_LIBRARIES
     refloat_host_common
@@ -416,7 +413,7 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-generated-config-tests
-  "${REFLOAT_TEST_DIR}/cpp/generated_config_parser_test.cpp"
+  "${REFLOAT_TEST_DIR}/cpp/config/generated_config_parser_test.cpp"
   cpp.generated-config
   LINK_LIBRARIES
     refloat_conf_support
@@ -428,7 +425,7 @@ add_custom_target(
   refloat_host_tests
   DEPENDS
     refloat_generated_conf
-    refloat-migrated-c-tests
+    refloat-firmware-tests
     refloat-cpp-main-lifecycle-tests
     refloat-cpp-main-command-length-tests
     refloat-cpp-main-protocol-tests
@@ -436,7 +433,6 @@ add_custom_target(
     refloat-cpp-main-gnss-tests
     refloat-cpp-main-gnss-missing-tests
     refloat-cpp-main-gnss-null-tests
-    refloat-cpp-smoke-tests
     refloat-generated-config-tests
     refloat-cpp-circular-buffer-tests
     refloat-cpp-leds-tests
@@ -445,15 +441,20 @@ add_custom_target(
 if(REFLOAT_BUILD_PACKAGE)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   find_program(REFLOAT_VESC_TOOL_EXECUTABLE NAMES vesc_tool REQUIRED)
+  find_program(REFLOAT_QMLTESTRUNNER_EXECUTABLE NAMES qmltestrunner REQUIRED)
   find_program(REFLOAT_ARM_GCC_EXECUTABLE NAMES arm-none-eabi-gcc REQUIRED)
   find_program(REFLOAT_ARM_OBJDUMP_EXECUTABLE NAMES arm-none-eabi-objdump REQUIRED)
   find_program(REFLOAT_ARM_OBJCOPY_EXECUTABLE NAMES arm-none-eabi-objcopy REQUIRED)
+  get_filename_component(REFLOAT_QT_BIN_DIR "${REFLOAT_QMLTESTRUNNER_EXECUTABLE}" DIRECTORY)
+  get_filename_component(REFLOAT_QT_ROOT_DIR "${REFLOAT_QT_BIN_DIR}" DIRECTORY)
+  set(REFLOAT_QT_QML_IMPORT_DIR "${REFLOAT_QT_ROOT_DIR}/lib/qt-6/qml")
 
   set(REFLOAT_PACKAGE_README_INPUT "${REFLOAT_ROOT}/package_README.md")
   set(REFLOAT_PACKAGE_README_OUTPUT "${REFLOAT_ROOT}/package_README-gen.md")
   set(REFLOAT_PACKAGE_QML_INPUT "${REFLOAT_ROOT}/ui.qml.in")
   set(REFLOAT_PACKAGE_QML_OUTPUT "${REFLOAT_ROOT}/ui.qml")
   set(REFLOAT_PACKAGE_ARTIFACT "${REFLOAT_ROOT}/refloat.vescpkg")
+  set(REFLOAT_PACKAGE_BUILD_LOG "${CMAKE_CURRENT_BINARY_DIR}/refloat-package.log")
   set(REFLOAT_PACKAGE_CONF_OUTPUTS
     "${REFLOAT_SRC_DIR}/conf/conf_default.h"
     "${REFLOAT_SRC_DIR}/conf/confparser.h"
@@ -643,7 +644,13 @@ if(REFLOAT_BUILD_PACKAGE)
 
   add_custom_command(
     OUTPUT "${REFLOAT_PACKAGE_ARTIFACT}"
-    COMMAND "${REFLOAT_VESC_TOOL_EXECUTABLE}" --buildPkgFromDesc pkgdesc.qml
+    BYPRODUCTS "${REFLOAT_PACKAGE_BUILD_LOG}"
+    COMMAND
+      "${CMAKE_COMMAND}"
+      -DREFLOAT_ROOT=${REFLOAT_ROOT}
+      -DREFLOAT_VESC_TOOL_EXECUTABLE=${REFLOAT_VESC_TOOL_EXECUTABLE}
+      -DREFLOAT_PACKAGE_BUILD_LOG=${REFLOAT_PACKAGE_BUILD_LOG}
+      -P "${CMAKE_CURRENT_LIST_DIR}/RefloatBuildPackage.cmake"
     WORKING_DIRECTORY "${REFLOAT_ROOT}"
     DEPENDS
       "${REFLOAT_ROOT}/pkgdesc.qml"
@@ -657,11 +664,11 @@ if(REFLOAT_BUILD_PACKAGE)
   )
 
   add_custom_target(
-    refloat-package-only
+    refloat-package-artifact
     DEPENDS "${REFLOAT_PACKAGE_ARTIFACT}"
   )
   add_dependencies(
-    refloat-package-only
+    refloat-package-artifact
     refloat-package-lib
     refloat-package-readme
     refloat-package-qml
@@ -669,6 +676,31 @@ if(REFLOAT_BUILD_PACKAGE)
 
   add_custom_target(
     refloat-package
-    DEPENDS refloat-package-only
+    DEPENDS refloat-package-artifact
   )
+
+  add_test(
+    NAME refloat.qml.pkgdesc
+    COMMAND "${REFLOAT_QMLTESTRUNNER_EXECUTABLE}" -input "${REFLOAT_TEST_DIR}/qml"
+    WORKING_DIRECTORY "${REFLOAT_ROOT}"
+  )
+  set_tests_properties(
+    refloat.qml.pkgdesc
+    PROPERTIES
+      LABELS "package;qml"
+      ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QML2_IMPORT_PATH=${REFLOAT_QT_QML_IMPORT_DIR};QML_IMPORT_PATH=${REFLOAT_QT_QML_IMPORT_DIR}"
+  )
+
+  set(REFLOAT_PACKAGE_PAYLOAD_LIMIT_BYTES 131072)
+  add_test(
+    NAME refloat.package.payload-limit
+    COMMAND
+      "${CMAKE_COMMAND}"
+      -DREFLOAT_ROOT=${REFLOAT_ROOT}
+      -DREFLOAT_PACKAGE_ARTIFACT=${REFLOAT_PACKAGE_ARTIFACT}
+      -DREFLOAT_PACKAGE_BUILD_LOG=${REFLOAT_PACKAGE_BUILD_LOG}
+      -DREFLOAT_PACKAGE_PAYLOAD_LIMIT_BYTES=${REFLOAT_PACKAGE_PAYLOAD_LIMIT_BYTES}
+      -P "${CMAKE_CURRENT_LIST_DIR}/RefloatCheckPackagePayload.cmake"
+  )
+  set_tests_properties(refloat.package.payload-limit PROPERTIES LABELS "package;payload")
 endif()

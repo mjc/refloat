@@ -7,6 +7,9 @@
 
 extern "C" {
 #include "circular_buffer.h"
+
+void led_driver_fake_reset(void);
+std::size_t led_driver_fake_setup_calls(void);
 }
 
 struct BufferItem {
@@ -167,4 +170,10 @@ TEST_CASE("circular buffer size reflects internal positions", "[circular-buffer]
     fixture.buffer.tail = 0;
     fixture.buffer.empty = true;
     CHECK(circular_buffer_size(&fixture.buffer) == 0);
+}
+
+TEST_CASE("test fakes link into C++ suites", "[fakes]") {
+    led_driver_fake_reset();
+
+    CHECK(led_driver_fake_setup_calls() == 0);
 }
