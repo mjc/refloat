@@ -67,6 +67,7 @@ static bool buffer_item_eq(BufferItem lhs, BufferItem rhs) {
 #include "c_tests/turn_reverse_alert/tests.c"
 #include "c_tests/konami_haptic/tests.c"
 #include "c_tests/pid_filters_lcm/tests.c"
+#include "c_tests/lcm/tests.c"
 
 int main(void) {
     const TestCase tests[] = {        XFAIL_CASE("frequency tracker nonpositive dt", test_frequency_tracker_nonpositive_dt,
