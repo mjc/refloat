@@ -69,6 +69,7 @@ static bool buffer_item_eq(BufferItem lhs, BufferItem rhs) {
 #include "c_tests/pid_filters_lcm/tests.c"
 #include "c_tests/lcm/tests.c"
 #include "c_tests/circular_buffer/tests.c"
+#include "c_tests/data_recorder/tests.c"
 
 int main(void) {
     const TestCase tests[] = {        XFAIL_CASE("frequency tracker nonpositive dt", test_frequency_tracker_nonpositive_dt,
