@@ -61,16 +61,17 @@ static bool buffer_item_eq(BufferItem lhs, BufferItem rhs) {
 
 #include "c_tests/smooth_state_time/tests.c"
 #include "c_tests/input_remote_imu/tests.c"
-#include "c_tests/bms_leds_data/tests.c"
+#include "c_tests/bms/tests.c"
 #include "c_tests/tilt_balance/tests.c"
 #include "c_tests/motor/tests.c"
 #include "c_tests/turn_reverse_alert/tests.c"
 #include "c_tests/konami_haptic/tests.c"
-#include "c_tests/pid_filters_lcm/tests.c"
+#include "c_tests/sma/tests.c"
 #include "c_tests/lcm/tests.c"
 #include "c_tests/circular_buffer/tests.c"
 #include "c_tests/data_recorder/tests.c"
 #include "c_tests/led_driver/tests.c"
+#include "c_tests/led_strip/tests.c"
 
 int main(void) {
     const TestCase tests[] = {        XFAIL_CASE("frequency tracker nonpositive dt", test_frequency_tracker_nonpositive_dt,
