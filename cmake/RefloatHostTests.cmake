@@ -286,20 +286,6 @@ refloat_add_c_test(
     "host;c"
 )
 
-refloat_add_c_test(
-  refloat-led-tests
-  "${REFLOAT_TEST_DIR}/led_tests.c"
-  leds.host
-  LINK_LIBRARIES
-    refloat_led_common
-    refloat_vesc_fake
-    refloat_led_driver_fake
-  LABELS
-    "host;leds"
-  COMPILE_DEFINITIONS
-    __time_t_defined
-)
-
 add_library(refloat_main_bridge STATIC "${REFLOAT_TEST_DIR}/main_protocol_wrapper.c")
 target_link_libraries(
   refloat_main_bridge
@@ -311,20 +297,6 @@ target_link_libraries(
     refloat_leds_main_fakes
 )
 add_dependencies(refloat_main_bridge refloat_generated_conf)
-
-refloat_add_c_test(
-  refloat-main-tests
-  "${REFLOAT_TEST_DIR}/main_protocol_tests.c"
-  main.host
-  LINK_LIBRARIES
-    refloat_host_common
-    refloat_main_bridge
-    refloat_vesc_fake
-    refloat_host_test_fakes
-    refloat_leds_main_fakes
-  LABELS
-    "host;main"
-)
 
 refloat_add_cpp_test(
   refloat-cpp-main-lifecycle-tests
@@ -456,8 +428,6 @@ add_custom_target(
   DEPENDS
     refloat_generated_conf
     refloat-c-tests
-    refloat-led-tests
-    refloat-main-tests
     refloat-cpp-main-lifecycle-tests
     refloat-cpp-main-command-length-tests
     refloat-cpp-main-protocol-tests

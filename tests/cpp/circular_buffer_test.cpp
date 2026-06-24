@@ -20,19 +20,6 @@ static bool operator==(const BufferItem &lhs, const BufferItem &rhs) {
     return lhs.lo == rhs.lo && lhs.hi == rhs.hi;
 }
 
-struct IterateCapture {
-    std::size_t count;
-    BufferItem first;
-};
-
-static void collect_item(const void *item, void *data) {
-    auto *capture = static_cast<IterateCapture *>(data);
-    if (capture->count == 0) {
-        capture->first = *static_cast<const BufferItem *>(item);
-    }
-    ++capture->count;
-}
-
 struct CircularBufferFixture {
     std::array<BufferItem, 3> storage{};
     CircularBuffer buffer{};
@@ -51,6 +38,17 @@ struct CircularBufferFixture {
         return item;
     }
 };
+
+struct IterateCapture {
+    std::array<BufferItem, 3> items{};
+    std::size_t count{};
+};
+
+static void collect_item(const void *item, void *data) {
+    auto *capture = static_cast<IterateCapture *>(data);
+    REQUIRE(capture->count < capture->items.size());
+    capture->items[capture->count++] = *static_cast<const BufferItem *>(item);
+}
 
 TEST_CASE("circular buffer keeps the newest items after wrapping", "[circular-buffer]") {
     CircularBufferFixture fixture;
@@ -77,10 +75,10 @@ TEST_CASE("circular buffer iterate and clear preserve sentinel behavior", "[circ
     fixture.push({2, 22});
     fixture.push({3, 33});
 
-    IterateCapture capture{0, {0, 0}};
+    IterateCapture capture{};
     circular_buffer_iterate(&fixture.buffer, collect_item, &capture);
     CHECK(capture.count == 3);
-    CHECK(capture.first == BufferItem{1, 11});
+    CHECK(capture.items[0] == BufferItem{1, 11});
 
     circular_buffer_clear(&fixture.buffer);
     CHECK(circular_buffer_size(&fixture.buffer) == 0);
@@ -88,6 +86,25 @@ TEST_CASE("circular buffer iterate and clear preserve sentinel behavior", "[circ
     BufferItem sentinel{0xaa, 0xbb};
     CHECK_FALSE(circular_buffer_get(&fixture.buffer, 0, &sentinel));
     CHECK(sentinel == BufferItem{0xaa, 0xbb});
+}
+
+TEST_CASE(
+    "circular buffer iterates item-size-scaled entries",
+    "[circular-buffer][!shouldfail]"
+) {
+    CircularBufferFixture fixture;
+
+    fixture.push({1, 11});
+    fixture.push({2, 22});
+    fixture.push({3, 33});
+
+    IterateCapture capture{};
+    circular_buffer_iterate(&fixture.buffer, collect_item, &capture);
+
+    REQUIRE(capture.count == 3);
+    CHECK(capture.items[0] == BufferItem{1, 11});
+    CHECK(capture.items[1] == BufferItem{2, 22});
+    CHECK(capture.items[2] == BufferItem{3, 33});
 }
 
 TEST_CASE("circular buffer tail pop removes oldest items in order", "[circular-buffer]") {
@@ -109,6 +126,21 @@ TEST_CASE("circular buffer tail pop removes oldest items in order", "[circular-b
     CHECK(circular_buffer_pop(&fixture.buffer, 0, &popped));
     CHECK(popped == BufferItem{3, 33});
     CHECK(circular_buffer_size(&fixture.buffer) == 0);
+}
+
+TEST_CASE("circular buffer pop removes the requested index", "[circular-buffer][!shouldfail]") {
+    CircularBufferFixture fixture;
+
+    fixture.push({1, 11});
+    fixture.push({2, 22});
+    fixture.push({3, 33});
+
+    BufferItem popped{0, 0};
+    CHECK(circular_buffer_pop(&fixture.buffer, 1, &popped));
+    CHECK(popped == BufferItem{2, 22});
+    CHECK(circular_buffer_size(&fixture.buffer) == 2);
+    CHECK(fixture.get(0) == BufferItem{1, 11});
+    CHECK(fixture.get(1) == BufferItem{3, 33});
 }
 
 TEST_CASE("circular buffer size reflects internal positions", "[circular-buffer]") {

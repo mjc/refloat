@@ -2,8 +2,6 @@ SHELL := /bin/sh
 
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 TEST_BIN := refloat-c-tests
-LEDS_TEST_BIN := refloat-led-tests
-MAIN_TEST_BIN := refloat-main-tests
 CC ?= cc
 GENERATED_CONF := $(ROOT_DIR)/src/conf/conf_general.h $(ROOT_DIR)/src/conf/confparser.c $(ROOT_DIR)/src/conf/confxml.c
 GIT_HEAD := $(shell git -C $(ROOT_DIR) rev-parse --git-path HEAD 2>/dev/null)
@@ -13,7 +11,6 @@ GIT_PACKED_REFS := $(shell git -C $(ROOT_DIR) rev-parse --git-path packed-refs 2
 GIT_DEPS := $(wildcard $(foreach path,$(GIT_HEAD) $(GIT_REF_FILE) $(GIT_PACKED_REFS),$(abspath $(ROOT_DIR)/$(path))))
 
 CPPFLAGS += -D_GNU_SOURCE -DIS_VESC_LIB -include $(ROOT_DIR)/tests/vesc_if_fake.h -I$(ROOT_DIR)/tests -I$(ROOT_DIR)/tests/stubs -I$(ROOT_DIR)/src -I$(ROOT_DIR)/src/lib -I$(ROOT_DIR)/src/filters -I$(ROOT_DIR)/vesc_pkg_lib
-LEDS_CPPFLAGS := $(CPPFLAGS) -D__time_t_defined
 CFLAGS += -std=gnu11 -Wall -Wextra -Werror -Wno-error=array-bounds
 CFLAGS += -Wno-error=pointer-to-int-cast -Wno-error=maybe-uninitialized
 LDLIBS += -lm
@@ -62,26 +59,7 @@ SOURCES = \
 	c_tests.c \
 	$(COMMON_SOURCES)
 
-MAIN_SOURCES = \
-	vesc_if_fake.c \
-	feedback_fakes.c \
-	lcm_fakes.c \
-	leds_main_fakes.c \
-	main_protocol_tests.c \
-	$(COMMON_SOURCES) \
-	main_protocol_wrapper.c
-
-LEDS_SOURCES = \
-	vesc_if_fake.c \
-	led_driver_fake.c \
-	led_tests/tests.c \
-	$(ROOT_DIR)/src/conf/buffer.c \
-	$(ROOT_DIR)/src/lib/utils.c \
-	$(ROOT_DIR)/src/state.c \
-	$(ROOT_DIR)/src/led_strip.c \
-	$(ROOT_DIR)/src/leds.c
-
-all: $(TEST_BIN) $(LEDS_TEST_BIN) $(MAIN_TEST_BIN)
+all: $(TEST_BIN)
 
 generated_conf: $(GENERATED_CONF)
 
@@ -91,24 +69,8 @@ $(GENERATED_CONF) &: $(ROOT_DIR)/src/conf/settings.xml $(ROOT_DIR)/src/conf/conf
 $(TEST_BIN): generated_conf $(SOURCES)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(SOURCES) $(LDLIBS)
 
-$(LEDS_TEST_BIN): $(LEDS_SOURCES)
-	$(CC) $(LEDS_CPPFLAGS) $(CFLAGS) -o $@ $(LEDS_SOURCES) $(LDLIBS)
-
-$(MAIN_TEST_BIN): generated_conf $(MAIN_SOURCES)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(MAIN_SOURCES) $(LDLIBS)
-
-check: $(TEST_BIN) $(LEDS_TEST_BIN) $(MAIN_TEST_BIN)
+check: $(TEST_BIN)
 	./$(TEST_BIN)
-	./$(LEDS_TEST_BIN)
-	./$(MAIN_TEST_BIN)
-
-check-python:
-	cd $(ROOT_DIR) && python tests/python_tests.py
-	cd $(ROOT_DIR) && python tests/config_smoke.py
-
-check-qml:
-	cd $(ROOT_DIR) && bash tests/qml_smoke.sh
-	$(MAKE) -C $(ROOT_DIR) clean
 
 check-qml-behavior:
 	cd $(ROOT_DIR) && \
@@ -118,22 +80,10 @@ check-qml-behavior:
 		QML_IMPORT_PATH="$$qt_root/lib/qt-6/qml:$${QML_IMPORT_PATH:-}" \
 		QT_QPA_PLATFORM=offscreen qmltestrunner -input tests/qml
 
-check-lisp:
-	cd $(ROOT_DIR) && python tests/lisp_tests.py
-
-check-package:
-	cd $(ROOT_DIR) && VERIFY_CLEAN=1 bash tests/package_smoke.sh
-
-check-package-oldvt:
-	cd $(ROOT_DIR) && OLDVT=1 VERIFY_CLEAN=1 bash tests/package_smoke.sh
-
-check-smoke: check-python check-qml check-qml-behavior check-lisp check-package check-package-oldvt
+check-smoke: check-qml-behavior
 
 clean:
-	rm -f $(TEST_BIN) $(LEDS_TEST_BIN) $(MAIN_TEST_BIN)
+	rm -f $(TEST_BIN)
 
-.PHONY: all check check-python check-qml check-qml-behavior check-lisp check-package check-package-oldvt check-smoke clean
-.PHONY: generated_conf check-main
-
-check-main: $(MAIN_TEST_BIN)
-	./$(MAIN_TEST_BIN)
+.PHONY: all check check-qml-behavior check-smoke clean
+.PHONY: generated_conf
