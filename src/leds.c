@@ -20,6 +20,7 @@
 #include "conf/datatypes.h"
 #include "led_driver.h"
 #include "lib/utils.h"
+#include "time.h"
 
 #include "vesc_c_if.h"
 
@@ -40,6 +41,10 @@
 #define W(c) ((uint8_t) ((c) >> 24))
 #define RGB(r, g, b) ((r) << 16 | (g) << 8 | (b))
 #define RGBW(r, g, b, w) ((w) << 24 | (r) << 16 | (g) << 8 | (b))
+
+static uint8_t color_channel(float value) {
+    return (uint8_t) clampf(value, 0.0f, 255.0f);
+}
 
 static const uint32_t colors[] = {
     0x00000000,  // BLACK
@@ -76,6 +81,11 @@ static const uint32_t colors[] = {
     0x00FF70A0,  // LAVENDER
 };
 
+static uint32_t led_color(LedColor color) {
+    return (unsigned) color < sizeof(colors) / sizeof(colors[0]) ? colors[color]
+                                                                 : colors[COLOR_BLACK];
+}
+
 #define BATTERY_COLOR 0x00909090
 #define DUTY_COLOR 0x00FFB030
 #define MOTOR_CURRENT_COLOR 0x00FF5090
@@ -96,10 +106,10 @@ static uint32_t color_blend(uint32_t color1, uint32_t color2, float blend) {
 
     float blend1 = 1.0f - blend;
 
-    uint8_t r = R(color1) * blend1 + R(color2) * blend;
-    uint8_t g = G(color1) * blend1 + G(color2) * blend;
-    uint8_t b = B(color1) * blend1 + B(color2) * blend;
-    uint8_t w = W(color1) * blend1 + W(color2) * blend;
+    uint8_t r = color_channel(R(color1) * blend1 + R(color2) * blend);
+    uint8_t g = color_channel(G(color1) * blend1 + G(color2) * blend);
+    uint8_t b = color_channel(B(color1) * blend1 + B(color2) * blend);
+    uint8_t w = color_channel(W(color1) * blend1 + W(color2) * blend);
 
     return RGBW(r, g, b, w);
 }
@@ -173,16 +183,16 @@ static void led_set_color(
         led = strip->length - i - 1;
     }
 
-    if (led >= strip->length) {
+    if (led >= strip->length) {  // GCOVR_EXCL_BR_LINE: callers derive the index from this strip.
         return;
     }
 
-    float br = brightness * leds->on_off_fade;
+    float br = (isfinite(brightness) ? clampf(brightness, 0.0f, 1.0f) : 0.0f) * leds->on_off_fade;
 
-    uint8_t r = R(color) * br + 0.5f;
-    uint8_t g = G(color) * br + 0.5f;
-    uint8_t b = B(color) * br + 0.5f;
-    uint8_t w = W(color) * br + 0.5f;
+    uint8_t r = color_channel(R(color) * br + 0.5f);
+    uint8_t g = color_channel(G(color) * br + 0.5f);
+    uint8_t b = color_channel(B(color) * br + 0.5f);
+    uint8_t w = color_channel(W(color) * br + 0.5f);
 
     if (blend < 1.0f) {
         uint32_t orig_color = strip->data[led];
@@ -220,12 +230,12 @@ static void strip_set_color(
 
 static void anim_fade(Leds *leds, const LedStrip *strip, const LedBar *bar, float time) {
     float p = cosine_progress(time);
-    uint32_t color = color_blend(colors[bar->color2], colors[bar->color1], p);
+    uint32_t color = color_blend(led_color(bar->color2), led_color(bar->color1), p);
     strip_set_color(leds, strip, color, strip->brightness, 1.0f);
 }
 
 static void anim_strobe(Leds *leds, const LedStrip *strip, const LedBar *bar, float time) {
-    uint32_t color = fmodf(time, 2.0f) >= 1.0f ? colors[bar->color2] : colors[bar->color1];
+    uint32_t color = fmodf(time, 2.0f) >= 1.0f ? led_color(bar->color2) : led_color(bar->color1);
     strip_set_color(leds, strip, color, strip->brightness, 1.0f);
 }
 
@@ -251,7 +261,7 @@ static void anim_pulse(
         float k2 = clampf(dist2 / feather, 0.0f, 1.0f);
 
         uint32_t color =
-            color_blend(colors[bar->color2], colors[bar->color1], fminf(k1, k2) * fade);
+            color_blend(led_color(bar->color2), led_color(bar->color1), fminf(k1, k2) * fade);
         led_set_color(leds, strip, i, color, strip->brightness, 1.0f);
     }
 }
@@ -285,7 +295,7 @@ static void anim_knight_rider(Leds *leds, const LedStrip *strip, const LedBar *b
             k2 = 1 - x2 + floorf(x2);
         }
 
-        uint32_t color = color_blend(colors[bar->color2], colors[bar->color1], fmaxf(k1, k2));
+        uint32_t color = color_blend(led_color(bar->color2), led_color(bar->color1), fmaxf(k1, k2));
         led_set_color(leds, strip, i, color, strip->brightness, 1.0f);
     }
 }
@@ -301,7 +311,7 @@ static void anim_felony(Leds *leds, const LedStrip *strip, const LedBar *bar, fl
     uint8_t start_idx = strip->length / 2 + strip->length % 2;
     if (state_mod < state_duration) {
         strip_set_color_range(
-            leds, strip, colors[bar->color1], strip->brightness, 1.0f, 0, stop_idx
+            leds, strip, led_color(bar->color1), strip->brightness, 1.0f, 0, stop_idx
         );
         strip_set_color_range(leds, strip, color_off, strip->brightness, 1.0f, stop_idx, start_idx);
         strip_set_color_range(
@@ -311,15 +321,15 @@ static void anim_felony(Leds *leds, const LedStrip *strip, const LedBar *bar, fl
         strip_set_color_range(leds, strip, color_off, strip->brightness, 1.0f, 0, stop_idx);
         strip_set_color_range(leds, strip, color_off, strip->brightness, 1.0f, stop_idx, start_idx);
         strip_set_color_range(
-            leds, strip, colors[bar->color2], strip->brightness, 1.0f, start_idx, strip->length
+            leds, strip, led_color(bar->color2), strip->brightness, 1.0f, start_idx, strip->length
         );
     } else {
         strip_set_color_range(
-            leds, strip, colors[bar->color2], strip->brightness, 1.0f, 0, stop_idx
+            leds, strip, led_color(bar->color2), strip->brightness, 1.0f, 0, stop_idx
         );
         strip_set_color_range(leds, strip, color_off, strip->brightness, 1.0f, stop_idx, start_idx);
         strip_set_color_range(
-            leds, strip, colors[bar->color1], strip->brightness, 1.0f, start_idx, strip->length
+            leds, strip, led_color(bar->color1), strip->brightness, 1.0f, start_idx, strip->length
         );
     }
 }
@@ -327,7 +337,7 @@ static void anim_felony(Leds *leds, const LedStrip *strip, const LedBar *bar, fl
 static void anim_rainbow_cycle(Leds *leds, const LedStrip *strip, float time) {
     const uint8_t count = 10;
     const float segment = 255.0f / count;
-    uint8_t color_idx = ((uint8_t) (time * count) % count) * segment;
+    uint8_t color_idx = (uint8_t) (fmodf(time, 1.0f) * count) * segment;
     strip_set_color(leds, strip, hue_to_color(color_idx), strip->brightness, 1.0f);
 }
 
@@ -351,11 +361,11 @@ static void anim_rainbow_roll(Leds *leds, const LedStrip *strip, float time) {
 }
 
 static void led_strip_animate(Leds *leds, const LedStrip *strip, const LedBar *bar, float time) {
-    time *= bar->speed;
+    time *= isfinite(bar->speed) ? clampf(bar->speed, 0.0f, 15.0f) : 0.0f;
 
     switch (bar->mode) {
     case LED_ANIM_SOLID:
-        strip_set_color(leds, strip, colors[bar->color1], strip->brightness, 1.0f);
+        strip_set_color(leds, strip, led_color(bar->color1), strip->brightness, 1.0f);
         break;
     case LED_ANIM_FADE:
         anim_fade(leds, strip, bar, time);
@@ -380,6 +390,9 @@ static void led_strip_animate(Leds *leds, const LedStrip *strip, const LedBar *b
         break;
     case LED_ANIM_RAINBOW_ROLL:
         anim_rainbow_roll(leds, strip, time);
+        break;
+    default:
+        strip_set_color(leds, strip, 0, strip->brightness, 1.0f);
         break;
     }
 }
@@ -434,7 +447,11 @@ static void anim_progress_bar(
     float remaining = (progress - floorf(progress)) * 0.7f;
 
     uint8_t red_offset = 0;
-    uint8_t red_led_nr = roundf(strip->length * leds->cfg->status.red_bar_percentage);
+    const float red_bar_percentage = isfinite(leds->cfg->status.red_bar_percentage)
+        ? clampf(leds->cfg->status.red_bar_percentage, 0.0f, 0.5f)
+        : 0.0f;
+    uint8_t red_led_nr =
+        (uint8_t) roundf(clampf(strip->length * red_bar_percentage, 0.0f, strip->length));
     if (color_end) {
         red_offset = strip->length - red_led_nr;
     } else {
@@ -465,7 +482,8 @@ static void anim_progress_bar(
 static void anim_battery_bar(
     Leds *leds, const LedStrip *strip, float value, bool reverse, float blend, float current_time
 ) {
-    float battery = clampf(value, 0.0f, 1.0f);
+    // VESC can return NaN when the battery configuration has no usable capacity.
+    float battery = isfinite(value) ? clampf(value, 0.0f, 1.0f) : 0.0f;
     anim_progress_bar(leds, strip, battery, BATTERY_COLOR, false, reverse, blend);
 
     float blink_threshold = 1.0f / strip->length;
@@ -573,7 +591,7 @@ static void status_animate(
                 leds,
                 &leds->status_strip,
                 &leds->cfg->status_idle,
-                current_time - leds->status_animation_start
+                system_time_age(current_time, leds->status_animation_start)
             );
         }
     }
@@ -610,8 +628,8 @@ static void status_animate(
         }
     }
 
-    float conf_prog =
-        (current_time - leds->confirm_animation_start) * (1.0f / CONFIRM_ANIMATION_DURATION);
+    float conf_prog = system_time_age(current_time, leds->confirm_animation_start) *
+        (1.0f / CONFIRM_ANIMATION_DURATION);
     if (conf_prog <= 1.0f) {
         anim_confirm(leds, strip, conf_prog);
     }
@@ -642,7 +660,7 @@ static uint32_t led_bar_to_color(const LedBar *bar) {
 }
 
 static void trans_fade(Leds *leds, const LedStrip *strip, float progress, const LedBar *to_bar) {
-    uint32_t to_color = colors[led_bar_to_color(to_bar)];
+    uint32_t to_color = led_color(led_bar_to_color(to_bar));
     float prog = (progress + 1.0f) / 2.0f;
     float brightness = strip->brightness + (to_bar->brightness - strip->brightness) * prog;
     strip_set_color(leds, strip, to_color, brightness, prog);
@@ -656,7 +674,7 @@ static void trans_fade_out_in(
         float brightness = strip->brightness + (to_bar->brightness - strip->brightness) * prog;
         strip_set_color(leds, strip, 0x00000000, brightness, prog);
     } else {
-        uint32_t to_color = color_blend(0x00000000, colors[led_bar_to_color(to_bar)], progress);
+        uint32_t to_color = color_blend(0x00000000, led_color(led_bar_to_color(to_bar)), progress);
         float brightness = strip->brightness + (to_bar->brightness - strip->brightness) * progress;
         strip_set_color(leds, strip, to_color, brightness, 1.0f);
     }
@@ -673,7 +691,7 @@ static void trans_cipher(
     const CipherData *data = &strip->trans_data.cipher;
     int8_t prog = progress * strip->length;
 
-    uint32_t to_color = colors[led_bar_to_color(to_bar)];
+    uint32_t to_color = led_color(led_bar_to_color(to_bar));
     float mid_brightness = (strip->brightness + to_bar->brightness) / 2.0f;
 
     for (int8_t i = 1 - strip->length; i <= prog; ++i) {
@@ -688,7 +706,7 @@ static void trans_cipher(
                 color = 0x00000000;
             } else {
                 if (mono) {
-                    color = color_blend(colors[from_bar->color1], to_color, r / 256.0f);
+                    color = color_blend(led_color(from_bar->color1), to_color, r / 256.0f);
                 } else {
                     // random fade to white
                     uint8_t wf = rnd(j + target_j + 23) % 128 + 80;
@@ -727,6 +745,9 @@ static void led_strip_transition(
         break;
     case LED_TRANS_MONO_CIPHER:
         trans_cipher(leds, strip, progress, from_bar, to_bar, true);
+        break;
+    default:
+        trans_fade(leds, strip, progress, to_bar);
         break;
     }
 }
@@ -837,10 +858,54 @@ void leds_init(Leds *leds) {
 }
 
 void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg) {
-    uint8_t status_offset = 0;
-    uint8_t front_offset = 0;
-    uint8_t rear_offset = 0;
-    uint8_t current_offset = 0;
+    if (cfg->headlights_on) {
+        leds->status_strip.brightness = cfg->status.brightness_headlights_on;
+    } else {
+        leds->status_strip.brightness = cfg->status.brightness_headlights_off;
+    }
+    leds->front_strip.brightness = cfg->front.brightness;
+    leds->rear_strip.brightness = cfg->rear.brightness;
+
+    leds->cfg = cfg;
+
+    leds->front_bar = &cfg->front;
+    leds->front_dir_target = &cfg->front;
+    leds->front_time_target = &cfg->front;
+
+    leds->rear_bar = &cfg->rear;
+    leds->rear_dir_target = &cfg->rear;
+    leds->rear_time_target = &cfg->rear;
+
+    leds_configure(leds, cfg);
+
+    if (hw_cfg->status.count > LED_STRIP_CONFIG_COUNT_MAX ||
+        hw_cfg->front.count > LED_STRIP_CONFIG_COUNT_MAX ||
+        hw_cfg->rear.count > LED_STRIP_CONFIG_COUNT_MAX) {
+        log_error("LED strip count exceeds the configured maximum.");
+        return;
+    }
+
+    if ((hw_cfg->status.count > 0 && hw_cfg->status.order > STRIP_COUNT) ||
+        (hw_cfg->front.count > 0 && hw_cfg->front.order > STRIP_COUNT) ||
+        (hw_cfg->rear.count > 0 && hw_cfg->rear.order > STRIP_COUNT)) {
+        log_error("LED strip order is invalid.");
+        return;
+    }
+
+    if ((hw_cfg->status.order > 0 && hw_cfg->status.count > 0 && hw_cfg->front.count > 0 &&
+         hw_cfg->status.order == hw_cfg->front.order) ||
+        (hw_cfg->status.order > 0 && hw_cfg->status.count > 0 && hw_cfg->rear.count > 0 &&
+         hw_cfg->status.order == hw_cfg->rear.order) ||
+        (hw_cfg->front.order > 0 && hw_cfg->front.count > 0 && hw_cfg->rear.count > 0 &&
+         hw_cfg->front.order == hw_cfg->rear.order)) {
+        log_error("LED strip orders must be unique.");
+        return;
+    }
+
+    size_t status_offset = 0;
+    size_t front_offset = 0;
+    size_t rear_offset = 0;
+    size_t current_offset = 0;
 
     const LedStrip *strip_array[STRIP_COUNT] = {NULL};
     size_t strip_i = 0;
@@ -863,13 +928,11 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg) {
         }
     }
 
-    uint8_t led_count =
+    size_t led_count =
         leds->status_strip.length + leds->front_strip.length + leds->rear_strip.length;
 
     uint32_t *led_data = NULL;
-    if (leds->front_strip.length + leds->rear_strip.length > LEDS_FRONT_AND_REAR_COUNT_MAX) {
-        log_error("Front and rear LED counts exceed maximum.");
-    } else if (hw_cfg->mode & LED_MODE_INTERNAL && led_count > 0) {
+    if (hw_cfg->mode & LED_MODE_INTERNAL && led_count > 0) {
         led_data = VESC_IF->malloc(sizeof(uint32_t) * led_count);
         if (!led_data) {
             log_error("Failed to init LED data, out of memory.");
@@ -881,26 +944,6 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg) {
         }
     }
 
-    if (cfg->headlights_on) {
-        leds->status_strip.brightness = cfg->status.brightness_headlights_on;
-    } else {
-        leds->status_strip.brightness = cfg->status.brightness_headlights_off;
-    }
-    leds->front_strip.brightness = cfg->front.brightness;
-    leds->rear_strip.brightness = cfg->rear.brightness;
-
-    leds->cfg = cfg;
-
-    leds->front_bar = &cfg->front;
-    leds->front_dir_target = &cfg->front;
-    leds->front_time_target = &cfg->front;
-
-    leds->rear_bar = &cfg->rear;
-    leds->rear_dir_target = &cfg->rear;
-    leds->rear_time_target = &cfg->rear;
-
-    leds_configure(leds, cfg);
-
     if (led_data) {
         if (led_driver_setup(&leds->led_driver, hw_cfg->pin, hw_cfg->pin_config, strip_array)) {
             leds->led_data = led_data;
@@ -911,7 +954,8 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg) {
 }
 
 void leds_configure(Leds *leds, const CfgLeds *cfg) {
-    leds->motor_utilization_threshold = fmaxf(cfg->status.motor_utilization_threshold, 0.15);
+    leds->motor_utilization_threshold =
+        fminf(fmaxf(cfg->status.motor_utilization_threshold, 0.15f), 0.95f);
 
     leds->headlights_trans.transition = cfg->headlights_transition;
     leds->dir_trans.transition = cfg->direction_transition;
@@ -977,11 +1021,12 @@ void leds_update(
         leds->status_on_front_idle_time = current_time;
     }
 
-    if (!leds->board_is_upright && leds->pitch > 60) {
+    float abs_pitch = fabsf(leds->pitch);
+    if (!leds->board_is_upright && abs_pitch > 60) {
         leds->board_is_upright = true;
         leds->status_idle_time = current_time;
         leds->status_on_front_idle_time = current_time;
-    } else if (leds->board_is_upright && leds->pitch < 50) {
+    } else if (leds->board_is_upright && abs_pitch < 50) {
         leds->board_is_upright = false;
         leds->status_idle_time = current_time;
         if (leds->cfg->lights_off_when_lifted) {
@@ -1081,10 +1126,16 @@ void leds_update(
     }
 
     led_strip_animate(
-        leds, &leds->front_strip, leds->front_bar, current_time - leds->animation_start
+        leds,
+        &leds->front_strip,
+        leds->front_bar,
+        system_time_age(current_time, leds->animation_start)
     );
     led_strip_animate(
-        leds, &leds->rear_strip, leds->rear_bar, current_time - leds->animation_start
+        leds,
+        &leds->rear_strip,
+        leds->rear_bar,
+        system_time_age(current_time, leds->animation_start)
     );
 
     // headlights transition from off to on or vice versa
@@ -1109,7 +1160,7 @@ void leds_update(
         leds->headlights_time = current_time;
     } else if (leds->headlights_time > 0.0f) {
         // transition split is in range of [-1, 1], we want a 1 second transition
-        float time_diff = (current_time - leds->headlights_time) * 2;
+        float time_diff = system_time_age(current_time, leds->headlights_time) * 2;
         if (headlights_should == leds->headlights_on) {
             time_diff = -time_diff;
         }
@@ -1121,13 +1172,15 @@ void leds_update(
     float split = leds->dir_trans.split;
     if (leds->state.state == STATE_RUNNING && leds->headlights_time <= 0.0f) {
         float distance = VESC_IF->mc_get_distance();
-        float distance_diff = distance - leds->split_distance;
-        if (leds->state.darkride) {
-            distance_diff = -distance_diff;
+        if (isfinite(distance)) {
+            float distance_diff = distance - leds->split_distance;
+            if (leds->state.darkride) {
+                distance_diff = -distance_diff;
+            }
+            split = clampf(split + distance_diff * 2, -1.0f, 1.0f);
+            leds->split_distance = distance;
+            leds->dir_trans.split = split;
         }
-        split = clampf(split + distance_diff * 2, -1.0f, 1.0f);
-        leds->split_distance = distance;
-        leds->dir_trans.split = split;
     }
 
     // direction transition
@@ -1210,15 +1263,19 @@ void leds_update(
             leds->headlights_on = headlights_should;
             if (leds->state.state == STATE_RUNNING) {
                 // reset direction transition
-                leds->split_distance = VESC_IF->mc_get_distance();
+                float distance = VESC_IF->mc_get_distance();
+                if (isfinite(distance)) {
+                    leds->split_distance = distance;
+                }
             }
             reset_led_bars(leds, target_bar(leds, false), target_bar(leds, true), current_time);
         }
     }
 
     if (leds->status_strip.length > 0) {
-        float idle_timeout = leds->cfg->status.idle_timeout;
-        if (idle_timeout > 0.0f && current_time - leds->status_idle_time > idle_timeout) {
+        float idle_timeout = fminf(leds->cfg->status.idle_timeout, 300.0f);
+        if (idle_timeout > 0.0f &&
+            system_time_age(current_time, leds->status_idle_time) > idle_timeout) {
             if (leds->status_idle_blend == 0.0f) {
                 leds->status_animation_start = current_time;
             }
@@ -1235,7 +1292,7 @@ void leds_update(
     if (leds->cfg->status_on_front_when_lifted && leds->status_on_front_blend > 0.0f &&
         leds->front_strip.length > 0) {
         if (leds->cfg->lights_off_when_lifted &&
-            current_time - leds->status_on_front_idle_time > 3.0f) {
+            system_time_age(current_time, leds->status_on_front_idle_time) > 3.0f) {
             rate_limitf(&leds->status_on_front_idle_blend, 1.0f, BR_RATE);
         } else {
             rate_limitf(&leds->status_on_front_idle_blend, 0.0f, BR_RATE);
@@ -1260,7 +1317,7 @@ void leds_status_confirm(Leds *leds) {
     }
 
     float current_time = VESC_IF->system_time();
-    if (current_time - leds->confirm_animation_start > CONFIRM_ANIMATION_DURATION) {
+    if (system_time_age(current_time, leds->confirm_animation_start) > CONFIRM_ANIMATION_DURATION) {
         leds->confirm_animation_start = current_time;
     }
 }

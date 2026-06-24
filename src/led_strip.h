@@ -22,6 +22,9 @@
 #include <stdint.h>
 
 #define STRIP_COUNT 3
+// The configuration schema allows 30 LEDs per strip and cipher transitions
+// reserve two entries per LED in the fixed-size transition map.
+#define LED_STRIP_CONFIG_COUNT_MAX 30
 #define LEDS_FRONT_AND_REAR_COUNT_MAX 60
 
 typedef struct {
