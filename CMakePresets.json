@@ -1,0 +1,173 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "host-debug-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "REFLOAT_BUILD_TESTS": "ON",
+        "REFLOAT_STRICT_WARNINGS": "ON"
+      }
+    },
+    {
+      "name": "host-debug",
+      "displayName": "Host Debug",
+      "inherits": "host-debug-base"
+    },
+    {
+      "name": "host-debug-package",
+      "displayName": "Host Debug With Package Delegation",
+      "inherits": "host-debug-base",
+      "cacheVariables": {
+        "REFLOAT_BUILD_PACKAGE": "ON"
+      }
+    },
+    {
+      "name": "host-debug-package-only",
+      "displayName": "Host Debug Package Only",
+      "inherits": "host-debug-base",
+      "cacheVariables": {
+        "REFLOAT_BUILD_PACKAGE": "ON"
+      }
+    },
+    {
+      "name": "host-debug-coverage",
+      "displayName": "Host Debug With Coverage",
+      "inherits": "host-debug-base",
+      "cacheVariables": {
+        "REFLOAT_ENABLE_COVERAGE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "host-debug",
+      "configurePreset": "host-debug"
+    },
+    {
+      "name": "host-debug-package",
+      "configurePreset": "host-debug-package",
+      "targets": [
+        "refloat-package-only"
+      ]
+    },
+    {
+      "name": "host-debug-package-only",
+      "configurePreset": "host-debug-package-only",
+      "targets": [
+        "refloat-package-only"
+      ]
+    },
+    {
+      "name": "host-debug-package-lib",
+      "configurePreset": "host-debug-package",
+      "targets": [
+        "refloat-package-lib"
+      ]
+    },
+    {
+      "name": "host-debug-coverage",
+      "configurePreset": "host-debug-coverage"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "host-debug",
+      "configurePreset": "host-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "host-debug-coverage",
+      "configurePreset": "host-debug-coverage",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "host-debug",
+      "displayName": "Host Debug Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug"
+        },
+        {
+          "type": "build",
+          "name": "host-debug"
+        },
+        {
+          "type": "test",
+          "name": "host-debug"
+        }
+      ]
+    },
+    {
+      "name": "host-debug-package",
+      "displayName": "Host Debug Package Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug-package"
+        },
+        {
+          "type": "build",
+          "name": "host-debug-package"
+        }
+      ]
+    },
+    {
+      "name": "host-debug-package-only",
+      "displayName": "Host Debug Package Only Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug-package-only"
+        },
+        {
+          "type": "build",
+          "name": "host-debug-package-only"
+        }
+      ]
+    },
+    {
+      "name": "host-debug-package-lib",
+      "displayName": "Host Debug Package Lib Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug-package"
+        },
+        {
+          "type": "build",
+          "name": "host-debug-package-lib"
+        }
+      ]
+    },
+    {
+      "name": "host-debug-coverage",
+      "displayName": "Host Debug Coverage Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host-debug-coverage"
+        },
+        {
+          "type": "build",
+          "name": "host-debug-coverage"
+        },
+        {
+          "type": "test",
+          "name": "host-debug-coverage"
+        }
+      ]
+    }
+  ]
+}
