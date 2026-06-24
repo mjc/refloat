@@ -102,6 +102,14 @@ check: $(TEST_BIN) $(LEDS_TEST_BIN) $(MAIN_TEST_BIN)
 	./$(LEDS_TEST_BIN)
 	./$(MAIN_TEST_BIN)
 
+check-python:
+	cd $(ROOT_DIR) && python tests/python_tests.py
+	cd $(ROOT_DIR) && python tests/config_smoke.py
+
+check-qml:
+	cd $(ROOT_DIR) && bash tests/qml_smoke.sh
+	$(MAKE) -C $(ROOT_DIR) clean
+
 check-qml-behavior:
 	cd $(ROOT_DIR) && \
 		qt_bin="$$(dirname "$$(command -v qmltestrunner)")" && \
@@ -110,12 +118,21 @@ check-qml-behavior:
 		QML_IMPORT_PATH="$$qt_root/lib/qt-6/qml:$${QML_IMPORT_PATH:-}" \
 		QT_QPA_PLATFORM=offscreen qmltestrunner -input tests/qml
 
-check-smoke: check-qml-behavior
+check-lisp:
+	cd $(ROOT_DIR) && python tests/lisp_tests.py
+
+check-package:
+	cd $(ROOT_DIR) && VERIFY_CLEAN=1 bash tests/package_smoke.sh
+
+check-package-oldvt:
+	cd $(ROOT_DIR) && OLDVT=1 VERIFY_CLEAN=1 bash tests/package_smoke.sh
+
+check-smoke: check-python check-qml check-qml-behavior check-lisp check-package check-package-oldvt
 
 clean:
 	rm -f $(TEST_BIN) $(LEDS_TEST_BIN) $(MAIN_TEST_BIN)
 
-.PHONY: all check check-qml-behavior check-smoke clean
+.PHONY: all check check-python check-qml check-qml-behavior check-lisp check-package check-package-oldvt check-smoke clean
 .PHONY: generated_conf check-main
 
 check-main: $(MAIN_TEST_BIN)
