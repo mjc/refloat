@@ -3,7 +3,7 @@ static bool expect_byte_bits(
 ) {
     for (uint8_t bit = 0; bit < 8; ++bit) {
         uint16_t expected = (value & (1u << bit)) != 0 ? one : zero;
-        CHECK(bits[offset + bit] == expected);
+        EXPECT_TRUE(bits[offset + bit] == expected);
     }
     return true;
 }
@@ -61,8 +61,8 @@ static const uint8_t *send_data_recorder_request(
 static bool test_bms_faults(void) {
     BMS bms;
     bms_init(&bms);
-    CHECK_FLOAT_NEAR(bms.msg_age, 42.0f);
-    CHECK(bms.fault_mask == BMSF_NONE);
+    EXPECT_FLOAT_NEAR(bms.msg_age, 42.0f);
+    EXPECT_TRUE(bms.fault_mask == BMSF_NONE);
 
     CfgBMS cfg = default_bms_cfg();
 
@@ -70,11 +70,11 @@ static bool test_bms_faults(void) {
 
     bms.msg_age = 10.0f;
     bms_update(&bms, &cfg, &time);
-    CHECK(!bms_is_fault(&bms, BMSF_CONNECTION));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CONNECTION));
 
     timer_expire(&time, &time.start_timer, 6.0f);
     bms_update(&bms, &cfg, &time);
-    CHECK(bms_is_fault(&bms, BMSF_CONNECTION));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CONNECTION));
 
     bms.msg_age = 0.0f;
     bms.cell_lv = 2.0f;
@@ -83,12 +83,12 @@ static bool test_bms_faults(void) {
     bms.cell_ht = 80;
     bms.bms_ht = 80;
     bms_update(&bms, &cfg, &time);
-    CHECK(bms_is_fault(&bms, BMSF_CELL_UNDER_VOLTAGE));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_OVER_VOLTAGE));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_UNDER_TEMP));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_OVER_TEMP));
-    CHECK(bms_is_fault(&bms, BMSF_OVER_TEMP));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_BALANCE));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_UNDER_VOLTAGE));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_OVER_VOLTAGE));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_UNDER_TEMP));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_OVER_TEMP));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_OVER_TEMP));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_BALANCE));
 
     cfg.cell_ht_threshold = 0;
     cfg.bms_ht_threshold = 0;
@@ -98,15 +98,15 @@ static bool test_bms_faults(void) {
     bms.cell_lv = 3.8f;
     bms.cell_hv = 3.85f;
     bms_update(&bms, &cfg, &time);
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_UNDER_TEMP));
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_OVER_TEMP));
-    CHECK(!bms_is_fault(&bms, BMSF_OVER_TEMP));
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_BALANCE));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_UNDER_TEMP));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_OVER_TEMP));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_OVER_TEMP));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_BALANCE));
 
     cfg.enabled = false;
     bms.fault_mask = 0xffffffffu;
     bms_update(&bms, &cfg, &time);
-    CHECK(bms.fault_mask == BMSF_NONE);
+    EXPECT_TRUE(bms.fault_mask == BMSF_NONE);
 
     return true;
 }
@@ -126,19 +126,19 @@ static bool test_bms_threshold_boundaries(void) {
     bms.msg_age = 5.0f;
     timer_expire(&time, &time.start_timer, 5.0f);
     bms_update(&bms, &cfg, &time);
-    CHECK(bms.fault_mask == BMSF_NONE);
+    EXPECT_TRUE(bms.fault_mask == BMSF_NONE);
 
     bms.msg_age = 5.001f;
     bms_update(&bms, &cfg, &time);
-    CHECK(!bms_is_fault(&bms, BMSF_CONNECTION));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CONNECTION));
 
     time.now += 1u;
     bms_update(&bms, &cfg, &time);
-    CHECK(bms_is_fault(&bms, BMSF_CONNECTION));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CONNECTION));
 
     bms.msg_age = 0.0f;
     bms_update(&bms, &cfg, &time);
-    CHECK(!bms_is_fault(&bms, BMSF_CONNECTION));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CONNECTION));
 
     bms.cell_lv = cfg.cell_lv_threshold;
     bms.cell_hv = cfg.cell_hv_threshold;
@@ -148,22 +148,22 @@ static bool test_bms_threshold_boundaries(void) {
     bms.msg_age = 0.0f;
     cfg.cell_balance_threshold = 2.0f;
     bms_update(&bms, &cfg, &time);
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_UNDER_VOLTAGE));
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_OVER_VOLTAGE));
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_UNDER_TEMP));
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_OVER_TEMP));
-    CHECK(!bms_is_fault(&bms, BMSF_OVER_TEMP));
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_BALANCE));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_UNDER_VOLTAGE));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_OVER_VOLTAGE));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_UNDER_TEMP));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_OVER_TEMP));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_OVER_TEMP));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_BALANCE));
 
     cfg.cell_balance_threshold = 0.1f;
     bms.cell_lv = 3.7f;
     bms.cell_hv = 3.8f;
     bms_update(&bms, &cfg, &time);
-    CHECK(!bms_is_fault(&bms, BMSF_CELL_BALANCE));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_CELL_BALANCE));
 
     bms.cell_hv += 0.001f;
     bms_update(&bms, &cfg, &time);
-    CHECK(bms_is_fault(&bms, BMSF_CELL_BALANCE));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_BALANCE));
 
     return true;
 }
@@ -184,12 +184,12 @@ static bool test_bms_faults_clear_on_recovery(void) {
     bms.cell_ht = 80;
     bms.bms_ht = 90;
     bms_update(&bms, &cfg, &time);
-    CHECK(bms_is_fault(&bms, BMSF_CELL_UNDER_VOLTAGE));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_OVER_VOLTAGE));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_UNDER_TEMP));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_OVER_TEMP));
-    CHECK(bms_is_fault(&bms, BMSF_OVER_TEMP));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_BALANCE));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_UNDER_VOLTAGE));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_OVER_VOLTAGE));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_UNDER_TEMP));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_OVER_TEMP));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_OVER_TEMP));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_BALANCE));
 
     bms.cell_lv = 3.70f;
     bms.cell_hv = 3.75f;
@@ -197,7 +197,7 @@ static bool test_bms_faults_clear_on_recovery(void) {
     bms.cell_ht = 25;
     bms.bms_ht = 30;
     bms_update(&bms, &cfg, &time);
-    CHECK(bms.fault_mask == BMSF_NONE);
+    EXPECT_TRUE(bms.fault_mask == BMSF_NONE);
 
     return true;
 }
@@ -210,7 +210,7 @@ static bool test_bms_startup_grace_waits_for_first_sample(void) {
 
     Time time = {.now = 100000u, .start_timer = 100000u};
     bms_update(&bms, &cfg, &time);
-    CHECK(bms.fault_mask == BMSF_NONE);
+    EXPECT_TRUE(bms.fault_mask == BMSF_NONE);
 
     return true;
 }
@@ -220,14 +220,14 @@ static bool test_bms_is_fault_none_is_false(void) {
     bms_init(&bms);
 
     bms.fault_mask = BMSF_NONE;
-    CHECK(!bms_is_fault(&bms, BMSF_NONE));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_NONE));
 
     bms.fault_mask = 0xffffffffu;
-    CHECK(!bms_is_fault(&bms, BMSF_NONE));
-    CHECK(!bms_is_fault(&bms, (BMSFaultCode) 8));
-    CHECK(!bms_is_fault(&bms, (BMSFaultCode) 99));
-    CHECK(bms_is_fault(&bms, BMSF_CONNECTION));
-    CHECK(bms_is_fault(&bms, BMSF_CELL_BALANCE));
+    EXPECT_TRUE(!bms_is_fault(&bms, BMSF_NONE));
+    EXPECT_TRUE(!bms_is_fault(&bms, (BMSFaultCode) 8));
+    EXPECT_TRUE(!bms_is_fault(&bms, (BMSFaultCode) 99));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CONNECTION));
+    EXPECT_TRUE(bms_is_fault(&bms, BMSF_CELL_BALANCE));
 
     return true;
 }
@@ -235,16 +235,16 @@ static bool test_bms_is_fault_none_is_false(void) {
 static bool test_led_strip(void) {
     LedStrip strip = {0};
     led_strip_init(&strip);
-    CHECK(strip.data == NULL);
-    CHECK(strip.length == 0);
-    CHECK(strip.color_order == LED_COLOR_GRB);
-    CHECK(!strip.reverse);
+    EXPECT_TRUE(strip.data == NULL);
+    EXPECT_TRUE(strip.length == 0);
+    EXPECT_TRUE(strip.color_order == LED_COLOR_GRB);
+    EXPECT_TRUE(!strip.reverse);
 
     CfgLedStrip cfg_strip = {.count = 5, .color_order = LED_COLOR_WRGB, .reverse = true};
     led_strip_configure(&strip, &cfg_strip);
-    CHECK(strip.length == 5);
-    CHECK(strip.color_order == LED_COLOR_WRGB);
-    CHECK(strip.reverse);
+    EXPECT_TRUE(strip.length == 5);
+    EXPECT_TRUE(strip.color_order == LED_COLOR_WRGB);
+    EXPECT_TRUE(strip.reverse);
 
     return true;
 }
@@ -268,50 +268,50 @@ static bool test_led_driver_setup_and_color_encoding(void) {
 
     LedDriver driver;
     led_driver_init(&driver);
-    CHECK(driver.bitbuffer == NULL);
-    CHECK(driver.bitbuffer_length == 0);
+    EXPECT_TRUE(driver.bitbuffer == NULL);
+    EXPECT_TRUE(driver.bitbuffer_length == 0);
 
-    CHECK(led_driver_setup(&driver, LED_PIN_B7, LED_PIN_CFG_PULLUP_TO_5V, strips));
-    CHECK(driver.pin == LED_PIN_B7);
-    CHECK(driver.bitbuffer != NULL);
-    CHECK(driver.bitbuffer_length == 24u * front.length + 32u * rear.length + 1u);
-    CHECK(driver.strip_bitbuffs[0] == driver.bitbuffer);
-    CHECK(driver.strip_bitbuffs[1] == driver.bitbuffer + 24u * front.length);
-    CHECK(driver.strip_bitbuffs[2] == NULL);
-    CHECK(vesc_if_fake_set_pad_mode_calls() == 1);
-    CHECK(vesc_if_fake_last_pad_gpio() == GPIOB);
-    CHECK_U32(vesc_if_fake_last_pad_pin(), 7u);
-    CHECK((vesc_if_fake_last_pad_mode() & PAL_STM32_OTYPE_OPENDRAIN) != 0);
-    CHECK(TIM4->ARR == 104u);
-    CHECK((TIM4->DIER & TIM_DMA_CC2) != 0);
-    CHECK((DMA1_Stream3->CR & DMA_SxCR_EN) != 0);
-    CHECK(DMA1_Stream3->NDTR == driver.bitbuffer_length);
-    CHECK(driver.bitbuffer[driver.bitbuffer_length - 1] == 0u);
+    EXPECT_TRUE(led_driver_setup(&driver, LED_PIN_B7, LED_PIN_CFG_PULLUP_TO_5V, strips));
+    EXPECT_TRUE(driver.pin == LED_PIN_B7);
+    EXPECT_TRUE(driver.bitbuffer != NULL);
+    EXPECT_TRUE(driver.bitbuffer_length == 24u * front.length + 32u * rear.length + 1u);
+    EXPECT_TRUE(driver.strip_bitbuffs[0] == driver.bitbuffer);
+    EXPECT_TRUE(driver.strip_bitbuffs[1] == driver.bitbuffer + 24u * front.length);
+    EXPECT_TRUE(driver.strip_bitbuffs[2] == NULL);
+    EXPECT_TRUE(vesc_if_fake_set_pad_mode_calls() == 1);
+    EXPECT_TRUE(vesc_if_fake_last_pad_gpio() == GPIOB);
+    EXPECT_EQ_U32(vesc_if_fake_last_pad_pin(), 7u);
+    EXPECT_TRUE((vesc_if_fake_last_pad_mode() & PAL_STM32_OTYPE_OPENDRAIN) != 0);
+    EXPECT_TRUE(TIM4->ARR == 104u);
+    EXPECT_TRUE((TIM4->DIER & TIM_DMA_CC2) != 0);
+    EXPECT_TRUE((DMA1_Stream3->CR & DMA_SxCR_EN) != 0);
+    EXPECT_TRUE(DMA1_Stream3->NDTR == driver.bitbuffer_length);
+    EXPECT_TRUE(driver.bitbuffer[driver.bitbuffer_length - 1] == 0u);
 
     led_driver_paint(&driver);
 
     const uint16_t zero = 31u;
     const uint16_t one = 72u;
 
-    CHECK(expect_byte_bits(driver.bitbuffer, 0, 0x00u, zero, one));
-    CHECK(expect_byte_bits(driver.bitbuffer, 8, 0xFFu, zero, one));
-    CHECK(expect_byte_bits(driver.bitbuffer, 16, 0x00u, zero, one));
+    EXPECT_TRUE(expect_byte_bits(driver.bitbuffer, 0, 0x00u, zero, one));
+    EXPECT_TRUE(expect_byte_bits(driver.bitbuffer, 8, 0xFFu, zero, one));
+    EXPECT_TRUE(expect_byte_bits(driver.bitbuffer, 16, 0x00u, zero, one));
 
     const size_t rear_offset = 24u * front.length;
-    CHECK(expect_byte_bits(driver.bitbuffer, rear_offset + 0, 0xFFu, zero, one));
-    CHECK(expect_byte_bits(driver.bitbuffer, rear_offset + 8, 0x00u, zero, one));
-    CHECK(expect_byte_bits(driver.bitbuffer, rear_offset + 16, 0x00u, zero, one));
-    CHECK(expect_byte_bits(driver.bitbuffer, rear_offset + 24, 0xFFu, zero, one));
+    EXPECT_TRUE(expect_byte_bits(driver.bitbuffer, rear_offset + 0, 0xFFu, zero, one));
+    EXPECT_TRUE(expect_byte_bits(driver.bitbuffer, rear_offset + 8, 0x00u, zero, one));
+    EXPECT_TRUE(expect_byte_bits(driver.bitbuffer, rear_offset + 16, 0x00u, zero, one));
+    EXPECT_TRUE(expect_byte_bits(driver.bitbuffer, rear_offset + 24, 0xFFu, zero, one));
 
-    CHECK((TIM4->DIER & TIM_DMA_CC2) != 0);
-    CHECK((DMA1_Stream3->CR & DMA_SxCR_EN) != 0);
-    CHECK((DMA1->LIFCR & (DMA_LIFCR_CTCIF0 << 22u)) != 0);
+    EXPECT_TRUE((TIM4->DIER & TIM_DMA_CC2) != 0);
+    EXPECT_TRUE((DMA1_Stream3->CR & DMA_SxCR_EN) != 0);
+    EXPECT_TRUE((DMA1->LIFCR & (DMA_LIFCR_CTCIF0 << 22u)) != 0);
 
     led_driver_destroy(&driver);
-    CHECK(driver.bitbuffer == NULL);
-    CHECK(driver.bitbuffer_length == 0);
-    CHECK(vesc_if_fake_free_calls() == 1);
-    CHECK((DMA1_Stream3->CR & DMA_SxCR_EN) == 0);
+    EXPECT_TRUE(driver.bitbuffer == NULL);
+    EXPECT_TRUE(driver.bitbuffer_length == 0);
+    EXPECT_TRUE(vesc_if_fake_free_calls() == 1);
+    EXPECT_TRUE((DMA1_Stream3->CR & DMA_SxCR_EN) == 0);
 
     return true;
 }
@@ -323,10 +323,10 @@ static bool test_led_driver_rejects_invalid_pin(void) {
     led_driver_init(&driver);
     const LedStrip *strips[STRIP_COUNT] = {NULL};
 
-    CHECK(!led_driver_setup(&driver, (LedPin) (LED_PIN_LAST + 1), LED_PIN_CFG_NO_PULLUP, strips));
-    CHECK(driver.bitbuffer == NULL);
-    CHECK(driver.bitbuffer_length == 0);
-    CHECK(vesc_if_fake_set_pad_mode_calls() == 0);
+    EXPECT_TRUE(!led_driver_setup(&driver, (LedPin) (LED_PIN_LAST + 1), LED_PIN_CFG_NO_PULLUP, strips));
+    EXPECT_TRUE(driver.bitbuffer == NULL);
+    EXPECT_TRUE(driver.bitbuffer_length == 0);
+    EXPECT_TRUE(vesc_if_fake_set_pad_mode_calls() == 0);
 
     return true;
 }
@@ -345,13 +345,13 @@ static bool test_led_driver_rejects_invalid_color_order(void) {
     LedDriver driver;
     led_driver_init(&driver);
 
-    CHECK(!led_driver_setup(&driver, LED_PIN_B6, LED_PIN_CFG_NO_PULLUP, strips));
-    CHECK(driver.bitbuffer == NULL);
-    CHECK(driver.bitbuffer_length == 0);
-    CHECK(vesc_if_fake_set_pad_mode_calls() == 0);
+    EXPECT_TRUE(!led_driver_setup(&driver, LED_PIN_B6, LED_PIN_CFG_NO_PULLUP, strips));
+    EXPECT_TRUE(driver.bitbuffer == NULL);
+    EXPECT_TRUE(driver.bitbuffer_length == 0);
+    EXPECT_TRUE(vesc_if_fake_set_pad_mode_calls() == 0);
 
     led_driver_paint(&driver);
-    CHECK(driver.bitbuffer == NULL);
+    EXPECT_TRUE(driver.bitbuffer == NULL);
 
     return true;
 }
@@ -375,10 +375,10 @@ static bool test_led_driver_rejects_oversized_strip_count(void) {
         led_driver_destroy(&driver);
     }
 
-    CHECK(!setup_ok);
-    CHECK(driver.bitbuffer == NULL);
-    CHECK(driver.bitbuffer_length == 0);
-    CHECK(vesc_if_fake_set_pad_mode_calls() == 0);
+    EXPECT_TRUE(!setup_ok);
+    EXPECT_TRUE(driver.bitbuffer == NULL);
+    EXPECT_TRUE(driver.bitbuffer_length == 0);
+    EXPECT_TRUE(vesc_if_fake_set_pad_mode_calls() == 0);
 
     return true;
 }
@@ -390,34 +390,34 @@ static bool test_led_driver_alternate_pins_and_noop_paths(void) {
     led_driver_init(&driver);
     led_driver_paint(&driver);
     led_driver_destroy(&driver);
-    CHECK(driver.bitbuffer == NULL);
-    CHECK(driver.bitbuffer_length == 0);
-    CHECK(vesc_if_fake_free_calls() == 0);
+    EXPECT_TRUE(driver.bitbuffer == NULL);
+    EXPECT_TRUE(driver.bitbuffer_length == 0);
+    EXPECT_TRUE(vesc_if_fake_free_calls() == 0);
 
     uint32_t data[] = {0xFFFFFFFFu};
     LedStrip strip = {.data = data, .length = 1, .color_order = LED_COLOR_GRBW};
     const LedStrip *strips[STRIP_COUNT] = {&strip, NULL, NULL};
 
-    CHECK(led_driver_setup(&driver, LED_PIN_B6, LED_PIN_CFG_NO_PULLUP, strips));
-    CHECK(driver.pin == LED_PIN_B6);
-    CHECK(driver.bitbuffer_length == 33u);
-    CHECK(vesc_if_fake_last_pad_gpio() == GPIOB);
-    CHECK_U32(vesc_if_fake_last_pad_pin(), 6u);
-    CHECK((vesc_if_fake_last_pad_mode() & PAL_STM32_OTYPE_OPENDRAIN) == 0);
-    CHECK((TIM4->DIER & TIM_DMA_CC1) != 0);
-    CHECK((DMA1_Stream0->CR & DMA_SxCR_EN) != 0);
+    EXPECT_TRUE(led_driver_setup(&driver, LED_PIN_B6, LED_PIN_CFG_NO_PULLUP, strips));
+    EXPECT_TRUE(driver.pin == LED_PIN_B6);
+    EXPECT_TRUE(driver.bitbuffer_length == 33u);
+    EXPECT_TRUE(vesc_if_fake_last_pad_gpio() == GPIOB);
+    EXPECT_EQ_U32(vesc_if_fake_last_pad_pin(), 6u);
+    EXPECT_TRUE((vesc_if_fake_last_pad_mode() & PAL_STM32_OTYPE_OPENDRAIN) == 0);
+    EXPECT_TRUE((TIM4->DIER & TIM_DMA_CC1) != 0);
+    EXPECT_TRUE((DMA1_Stream0->CR & DMA_SxCR_EN) != 0);
     led_driver_destroy(&driver);
-    CHECK((DMA1_Stream0->CR & DMA_SxCR_EN) == 0);
+    EXPECT_TRUE((DMA1_Stream0->CR & DMA_SxCR_EN) == 0);
 
-    CHECK(led_driver_setup(&driver, LED_PIN_C9, LED_PIN_CFG_PULLUP_TO_5V, strips));
-    CHECK(driver.pin == LED_PIN_C9);
-    CHECK(vesc_if_fake_last_pad_gpio() == GPIOC);
-    CHECK_U32(vesc_if_fake_last_pad_pin(), 9u);
-    CHECK((vesc_if_fake_last_pad_mode() & PAL_STM32_OTYPE_OPENDRAIN) != 0);
-    CHECK((TIM3->DIER & TIM_DMA_CC4) != 0);
-    CHECK((DMA1_Stream2->CR & DMA_SxCR_EN) != 0);
+    EXPECT_TRUE(led_driver_setup(&driver, LED_PIN_C9, LED_PIN_CFG_PULLUP_TO_5V, strips));
+    EXPECT_TRUE(driver.pin == LED_PIN_C9);
+    EXPECT_TRUE(vesc_if_fake_last_pad_gpio() == GPIOC);
+    EXPECT_EQ_U32(vesc_if_fake_last_pad_pin(), 9u);
+    EXPECT_TRUE((vesc_if_fake_last_pad_mode() & PAL_STM32_OTYPE_OPENDRAIN) != 0);
+    EXPECT_TRUE((TIM3->DIER & TIM_DMA_CC4) != 0);
+    EXPECT_TRUE((DMA1_Stream2->CR & DMA_SxCR_EN) != 0);
     led_driver_destroy(&driver);
-    CHECK((DMA1_Stream2->CR & DMA_SxCR_EN) == 0);
+    EXPECT_TRUE((DMA1_Stream2->CR & DMA_SxCR_EN) == 0);
 
     return true;
 }
@@ -427,7 +427,7 @@ static bool expect_byte_bits_msb(
 ) {
     for (uint8_t bit = 0; bit < 8; ++bit) {
         uint16_t expected = (value & (1u << (7u - bit))) != 0 ? one : zero;
-        CHECK(bits[offset + bit] == expected);
+        EXPECT_TRUE(bits[offset + bit] == expected);
     }
     return true;
 }
@@ -456,20 +456,20 @@ static bool test_led_driver_full_brightness_color_orders(void) {
 
         LedDriver driver;
         led_driver_init(&driver);
-        CHECK(led_driver_setup(&driver, LED_PIN_B7, LED_PIN_CFG_PULLUP_TO_5V, strips));
-        CHECK_U32(driver.bitbuffer_length, cases[i].bit_count + 1u);
+        EXPECT_TRUE(led_driver_setup(&driver, LED_PIN_B7, LED_PIN_CFG_PULLUP_TO_5V, strips));
+        EXPECT_EQ_U32(driver.bitbuffer_length, cases[i].bit_count + 1u);
 
         led_driver_paint(&driver);
 
         for (uint8_t byte = 0; byte < cases[i].bit_count / 8u; ++byte) {
-            CHECK(expect_byte_bits_msb(driver.bitbuffer, byte * 8u, cases[i].bytes[byte], zero, one));
+            EXPECT_TRUE(expect_byte_bits_msb(driver.bitbuffer, byte * 8u, cases[i].bytes[byte], zero, one));
         }
-        CHECK_U32(driver.bitbuffer[driver.bitbuffer_length - 1], 0u);
+        EXPECT_EQ_U32(driver.bitbuffer[driver.bitbuffer_length - 1], 0u);
 
         led_driver_destroy(&driver);
     }
 
-    CHECK_U32(vesc_if_fake_free_calls(), sizeof(cases) / sizeof(cases[0]));
+    EXPECT_EQ_U32(vesc_if_fake_free_calls(), sizeof(cases) / sizeof(cases[0]));
 
     return true;
 }
@@ -480,24 +480,24 @@ static bool test_data_recorder_requests(void) {
     Sample storage[2] = {0};
     DataRecord dr;
     init_data_record(&dr, storage, 2, true, false, true, true, 1, 100, 2);
-    CHECK(data_recorder_has_capability(&dr));
+    EXPECT_TRUE(data_recorder_has_capability(&dr));
 
     size_t len = 0;
     const uint8_t *payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 0);
-    CHECK(payload != NULL);
-    CHECK(len >= 7);
-    CHECK_U32(payload[0], 101u);
-    CHECK_U32(payload[1], 41u);
-    CHECK((payload[3] & 0x2) != 0);
-    CHECK((payload[3] & 0x1) == 0);
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_TRUE(len >= 7);
+    EXPECT_EQ_U32(payload[0], 101u);
+    EXPECT_EQ_U32(payload[1], 41u);
+    EXPECT_TRUE((payload[3] & 0x2) != 0);
+    EXPECT_TRUE((payload[3] & 0x1) == 0);
 
     data_recorder_trigger(&dr, true);
-    CHECK(dr.recording);
+    EXPECT_TRUE(dr.recording);
     data_recorder_trigger(&dr, false);
-    CHECK(!dr.recording);
+    EXPECT_TRUE(!dr.recording);
     dr.autostop = false;
     data_recorder_trigger(&dr, true);
-    CHECK(dr.recording);
+    EXPECT_TRUE(dr.recording);
 
     Data data = {0};
     data.state.state = STATE_RUNNING;
@@ -506,42 +506,42 @@ static bool test_data_recorder_requests(void) {
     data.state.wheelslip = true;
     data.motor.speed = 12.0f;
     data_recorder_sample(&dr, &data, 1234u);
-    CHECK(circular_buffer_size(&dr.buffer) == 1);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 1);
 
     payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 1);
-    CHECK(payload != NULL);
-    CHECK(len > 6);
-    CHECK_U32(payload[1], 42u);
-    CHECK_U32(payload[2], 0u);
-    CHECK_U32(payload[3], 0u);
-    CHECK_U32(payload[4], 0u);
-    CHECK_U32(payload[5], 1u);
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_TRUE(len > 6);
+    EXPECT_EQ_U32(payload[1], 42u);
+    EXPECT_EQ_U32(payload[2], 0u);
+    EXPECT_EQ_U32(payload[3], 0u);
+    EXPECT_EQ_U32(payload[4], 0u);
+    EXPECT_EQ_U32(payload[5], 1u);
 
     payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 2, 0, 0, 0, 0);
-    CHECK(payload != NULL);
-    CHECK(len > 10);
-    CHECK_U32(payload[1], 43u);
-    CHECK_U32(payload[2], 0u);
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_TRUE(len > 10);
+    EXPECT_EQ_U32(payload[1], 43u);
+    EXPECT_EQ_U32(payload[2], 0u);
 
     SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 1, 1);
-    CHECK(dr.recording);
+    EXPECT_TRUE(dr.recording);
     SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 1, 0);
-    CHECK(!dr.recording);
+    EXPECT_TRUE(!dr.recording);
 
     SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 2, 0);
-    CHECK(!dr.autostart);
+    EXPECT_TRUE(!dr.autostart);
     SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 3, 1);
-    CHECK(dr.autostop);
+    EXPECT_TRUE(dr.autostop);
     SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 4, 0);
-    CHECK(dr.decimation == 1);
+    EXPECT_TRUE(dr.decimation == 1);
 
     dr.recording = true;
     dr.decimation = 1;
     data_recorder_sample(&dr, &data, 2345u);
     data_recorder_sample(&dr, &data, 3456u);
-    CHECK(circular_buffer_size(&dr.buffer) == 2);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 2);
     data_recorder_sample(&dr, &data, 4567u);
-    CHECK(circular_buffer_size(&dr.buffer) == 2);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 2);
 
     return true;
 }
@@ -563,20 +563,20 @@ static bool test_data_recorder_experiment_plot_export(void) {
     data.motor.speed = 2.5f;
     data.motor.current = 6.0f;
     data_recorder_sample(&dr, &data, 222u);
-    CHECK(circular_buffer_size(&dr.buffer) == 2);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 2);
 
     data_recorder_send_experiment_plot(&dr);
 
-    CHECK(vesc_if_fake_plot_init_calls() == 1);
-    CHECK(vesc_if_fake_plot_add_graph_calls() == ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS));
-    CHECK(
+    EXPECT_TRUE(vesc_if_fake_plot_init_calls() == 1);
+    EXPECT_TRUE(vesc_if_fake_plot_add_graph_calls() == ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS));
+    EXPECT_TRUE(
         vesc_if_fake_plot_set_graph_calls() ==
         circular_buffer_size(&dr.buffer) * ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS)
     );
-    CHECK(vesc_if_fake_plot_send_points_calls() == vesc_if_fake_plot_set_graph_calls());
-    CHECK(vesc_if_fake_last_plot_graph() == (int) ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS) - 1);
-    CHECK_FLOAT_NEAR(vesc_if_fake_last_plot_x(), 222.0f);
-    CHECK(vesc_if_fake_last_plot_y() != 0.0f);
+    EXPECT_TRUE(vesc_if_fake_plot_send_points_calls() == vesc_if_fake_plot_set_graph_calls());
+    EXPECT_TRUE(vesc_if_fake_last_plot_graph() == (int) ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS) - 1);
+    EXPECT_FLOAT_NEAR(vesc_if_fake_last_plot_x(), 222.0f);
+    EXPECT_TRUE(vesc_if_fake_last_plot_y() != 0.0f);
 
     return true;
 }
@@ -589,53 +589,53 @@ static bool test_data_recorder_request_edges(void) {
     init_data_record(&dr, storage, 1, false, false, true, true, 1, 50, 1);
 
     size_t len = 123u;
-    CHECK(SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 0) == NULL);
-    CHECK_U32(len, 0u);
+    EXPECT_TRUE(SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 0) == NULL);
+    EXPECT_EQ_U32(len, 0u);
 
     dr.enabled = true;
-    CHECK(SEND_DATA_RECORDER_REQUEST(&dr, len, 1) == NULL);
-    CHECK_U32(len, 0u);
+    EXPECT_TRUE(SEND_DATA_RECORDER_REQUEST(&dr, len, 1) == NULL);
+    EXPECT_EQ_U32(len, 0u);
 
-    CHECK(SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 4) == NULL);
-    CHECK_U32(len, 0u);
+    EXPECT_TRUE(SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 4) == NULL);
+    EXPECT_EQ_U32(len, 0u);
 
-    CHECK(SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 2, 0, 0, 0) == NULL);
-    CHECK_U32(len, 0u);
+    EXPECT_TRUE(SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 2, 0, 0, 0) == NULL);
+    EXPECT_EQ_U32(len, 0u);
 
     const uint8_t *payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 99, 1);
-    CHECK(payload != NULL);
-    CHECK_U32(payload[1], 41u);
-    CHECK(dr.autostart);
-    CHECK(dr.autostop);
-    CHECK(!dr.recording);
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_EQ_U32(payload[1], 41u);
+    EXPECT_TRUE(dr.autostart);
+    EXPECT_TRUE(dr.autostop);
+    EXPECT_TRUE(!dr.recording);
 
     payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 2, 0, 0, 0, 0);
-    CHECK(payload != NULL);
-    CHECK_U32(payload[1], 41u);
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_EQ_U32(payload[1], 41u);
 
     Data data = {0};
     data.state.state = STATE_RUNNING;
     dr.recording = true;
     dr.decimation = 1;
     data_recorder_sample(&dr, &data, 100u);
-    CHECK(circular_buffer_size(&dr.buffer) == 1);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 1);
 
     const uint8_t *after_past_end = SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 2, 0, 0, 0, 1);
-    CHECK(after_past_end != NULL);
-    CHECK_U32(after_past_end[1], 43u);
-    CHECK_U32(after_past_end[2], 0u);
-    CHECK_U32(after_past_end[3], 0u);
-    CHECK_U32(after_past_end[4], 0u);
-    CHECK_U32(after_past_end[5], 1u);
-    CHECK(len == 6);
+    EXPECT_TRUE(after_past_end != NULL);
+    EXPECT_EQ_U32(after_past_end[1], 43u);
+    EXPECT_EQ_U32(after_past_end[2], 0u);
+    EXPECT_EQ_U32(after_past_end[3], 0u);
+    EXPECT_EQ_U32(after_past_end[4], 0u);
+    EXPECT_EQ_U32(after_past_end[5], 1u);
+    EXPECT_TRUE(len == 6);
 
     payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 2, 0, 0, 0, 0);
-    CHECK(payload != NULL);
-    CHECK_U32(payload[1], 43u);
-    CHECK_U32(payload[2], 0u);
-    CHECK_U32(payload[3], 0u);
-    CHECK_U32(payload[4], 0u);
-    CHECK_U32(payload[5], 0u);
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_EQ_U32(payload[1], 43u);
+    EXPECT_EQ_U32(payload[2], 0u);
+    EXPECT_EQ_U32(payload[3], 0u);
+    EXPECT_EQ_U32(payload[4], 0u);
+    EXPECT_EQ_U32(payload[5], 0u);
 
     return true;
 }
@@ -655,28 +655,28 @@ static bool test_data_recorder_decimation_and_sample_flags(void) {
     data.motor.speed = 12.5f;
 
     data_recorder_sample(&dr, &data, 100u);
-    CHECK(circular_buffer_size(&dr.buffer) == 0);
-    CHECK_U32(dr.decimation_counter, 1u);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 0);
+    EXPECT_EQ_U32(dr.decimation_counter, 1u);
     data_recorder_sample(&dr, &data, 200u);
-    CHECK(circular_buffer_size(&dr.buffer) == 0);
-    CHECK_U32(dr.decimation_counter, 2u);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 0);
+    EXPECT_EQ_U32(dr.decimation_counter, 2u);
     data_recorder_sample(&dr, &data, 300u);
-    CHECK(circular_buffer_size(&dr.buffer) == 1);
-    CHECK_U32(dr.decimation_counter, 0u);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 1);
+    EXPECT_EQ_U32(dr.decimation_counter, 0u);
 
     Sample sample = {0};
-    CHECK(circular_buffer_get(&dr.buffer, 0, &sample));
-    CHECK_U32(sample.time, 300u);
-    CHECK_U32(sample.flags, (SAT_PB_DUTY << 4) | (FS_RIGHT << 2) | 0x2u | 0x1u);
+    EXPECT_TRUE(circular_buffer_get(&dr.buffer, 0, &sample));
+    EXPECT_EQ_U32(sample.time, 300u);
+    EXPECT_EQ_U32(sample.flags, (SAT_PB_DUTY << 4) | (FS_RIGHT << 2) | 0x2u | 0x1u);
 
     dr.recording = false;
     data_recorder_sample(&dr, &data, 400u);
-    CHECK(circular_buffer_size(&dr.buffer) == 1);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 1);
 
     dr.recording = true;
     dr.enabled = false;
     data_recorder_sample(&dr, &data, 500u);
-    CHECK(circular_buffer_size(&dr.buffer) == 1);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 1);
 
     return true;
 }
@@ -687,12 +687,12 @@ static bool test_data_recorder_sample_rate_recomputes_decimation(void) {
     init_data_record(&dr, storage, 100, true, false, false, false, 10, 100, 100);
 
     data_recorder_set_sample_rate(&dr, 200);
-    CHECK_U32(dr.sample_rate, 200u);
-    CHECK_U32(dr.decimation, 20u);
+    EXPECT_EQ_U32(dr.sample_rate, 200u);
+    EXPECT_EQ_U32(dr.decimation, 20u);
 
     data_recorder_set_sample_rate(&dr, 5);
-    CHECK_U32(dr.sample_rate, 5u);
-    CHECK_U32(dr.decimation, 1u);
+    EXPECT_EQ_U32(dr.sample_rate, 5u);
+    EXPECT_EQ_U32(dr.decimation, 1u);
 
     return true;
 }
@@ -714,14 +714,14 @@ static bool test_data_recorder_status_and_data_serialization(void) {
 
     size_t len = 0;
     const uint8_t *payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 1, 0);
-    CHECK(payload != NULL);
-    CHECK_U32(len, 7u);
-    CHECK_U32(payload[0], 101u);
-    CHECK_U32(payload[1], 41u);
-    CHECK_U32(payload[2], 1u);
-    CHECK_U32(payload[3], 0x03u);
-    CHECK_U32(payload[4], 7u);
-    CHECK_U32(read_be16(&payload[5]), 65535u);
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_EQ_U32(len, 7u);
+    EXPECT_EQ_U32(payload[0], 101u);
+    EXPECT_EQ_U32(payload[1], 41u);
+    EXPECT_EQ_U32(payload[2], 1u);
+    EXPECT_EQ_U32(payload[3], 0x03u);
+    EXPECT_EQ_U32(payload[4], 7u);
+    EXPECT_EQ_U32(read_be16(&payload[5]), 65535u);
 
     Data data = {0};
     data.state.state = STATE_RUNNING;
@@ -746,22 +746,22 @@ static bool test_data_recorder_status_and_data_serialization(void) {
     data_recorder_sample(&dr, &data, 100u);
     data.motor.erpm = 4321.0f;
     data_recorder_sample(&dr, &data, 200u);
-    CHECK_U32(circular_buffer_size(&dr.buffer), 2u);
+    EXPECT_EQ_U32(circular_buffer_size(&dr.buffer), 2u);
 
     payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 2, 0, 0, 0, 1);
-    CHECK(payload != NULL);
-    CHECK_U32(payload[0], 101u);
-    CHECK_U32(payload[1], 43u);
-    CHECK_U32(read_be32(&payload[2]), 1u);
-    CHECK_U32(read_be32(&payload[6]), 200u);
-    CHECK_U32(payload[10], (SAT_PB_DUTY << 4) | (FS_BOTH << 2) | 0x2u | 0x1u);
-    CHECK_U32(len, 11u + 2u * ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS));
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_EQ_U32(payload[0], 101u);
+    EXPECT_EQ_U32(payload[1], 43u);
+    EXPECT_EQ_U32(read_be32(&payload[2]), 1u);
+    EXPECT_EQ_U32(read_be32(&payload[6]), 200u);
+    EXPECT_EQ_U32(payload[10], (SAT_PB_DUTY << 4) | (FS_BOTH << 2) | 0x2u | 0x1u);
+    EXPECT_EQ_U32(len, 11u + 2u * ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS));
 
     uint16_t second_erpm = 0;
     Sample sample = {0};
-    CHECK(circular_buffer_get(&dr.buffer, 1, &sample));
+    EXPECT_TRUE(circular_buffer_get(&dr.buffer, 1, &sample));
     second_erpm = sample.values[2];
-    CHECK_U32(read_be16(&payload[11 + 2 * 2]), second_erpm);
+    EXPECT_EQ_U32(read_be16(&payload[11 + 2 * 2]), second_erpm);
 
     return true;
 }
@@ -792,9 +792,9 @@ static bool test_data_recorder_rejects_tiny_backing_buffer(void) {
     data_recorder_init(&dr, 100u);
 
     signal(DATA_RECORDER_TINY_BUFFER_SIGFPE, previous_handler);
-    CHECK(!data_recorder_has_capability(&dr));
-    CHECK(!dr.recording);
-    CHECK(dr.sample_count == 0);
+    EXPECT_TRUE(!data_recorder_has_capability(&dr));
+    EXPECT_TRUE(!dr.recording);
+    EXPECT_TRUE(dr.sample_count == 0);
 
     return true;
 }
@@ -809,13 +809,13 @@ static bool test_data_recorder_data_send_pauses_recording(void) {
     Data data = {0};
     data.state.state = STATE_RUNNING;
     data_recorder_sample(&dr, &data, 100u);
-    CHECK(circular_buffer_size(&dr.buffer) == 1);
+    EXPECT_TRUE(circular_buffer_size(&dr.buffer) == 1);
 
     size_t len = 0;
     const uint8_t *payload = SEND_DATA_RECORDER_REQUEST(&dr, len, 2, 2, 0, 0, 0, 0);
-    CHECK(payload != NULL);
-    CHECK_U32(payload[1], 43u);
-    CHECK(!dr.recording);
+    EXPECT_TRUE(payload != NULL);
+    EXPECT_EQ_U32(payload[1], 43u);
+    EXPECT_TRUE(!dr.recording);
 
     return true;
 }

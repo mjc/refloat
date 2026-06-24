@@ -131,26 +131,26 @@ static void update_leds_at(
 static bool test_leds_setup_configures_internal_strips_and_runtime_defaults(void) {
     LEDS_SETUP_FIXTURE(4.0f);
 
-    CHECK(leds.led_data != NULL);
-    CHECK(led_driver_fake_setup_calls() == 1);
-    CHECK(vesc_if_fake_malloc_calls() == 1);
-    CHECK(leds.status_strip.data == leds.led_data);
-    CHECK(leds.front_strip.data == leds.led_data + hw.status.count);
-    CHECK(leds.rear_strip.data == leds.led_data + hw.status.count + hw.front.count);
-    CHECK(leds.status_strip.length == hw.status.count);
-    CHECK(leds.front_strip.length == hw.front.count);
-    CHECK(leds.rear_strip.length == hw.rear.count);
-    CHECK_FLOAT_NEAR(leds.status_strip.brightness, cfg.status.brightness_headlights_on);
-    CHECK_FLOAT_NEAR(leds.front_strip.brightness, cfg.front.brightness);
-    CHECK_FLOAT_NEAR(leds.rear_strip.brightness, cfg.rear.brightness);
-    CHECK(leds_get_runtime_status(&leds)->enabled);
-    CHECK(leds_get_runtime_status(&leds)->headlights_enabled);
-    CHECK_FLOAT_NEAR(leds.status_idle_time, 4.0f);
+    EXPECT_TRUE(leds.led_data != NULL);
+    EXPECT_TRUE(led_driver_fake_setup_calls() == 1);
+    EXPECT_TRUE(vesc_if_fake_malloc_calls() == 1);
+    EXPECT_TRUE(leds.status_strip.data == leds.led_data);
+    EXPECT_TRUE(leds.front_strip.data == leds.led_data + hw.status.count);
+    EXPECT_TRUE(leds.rear_strip.data == leds.led_data + hw.status.count + hw.front.count);
+    EXPECT_TRUE(leds.status_strip.length == hw.status.count);
+    EXPECT_TRUE(leds.front_strip.length == hw.front.count);
+    EXPECT_TRUE(leds.rear_strip.length == hw.rear.count);
+    EXPECT_FLOAT_NEAR(leds.status_strip.brightness, cfg.status.brightness_headlights_on);
+    EXPECT_FLOAT_NEAR(leds.front_strip.brightness, cfg.front.brightness);
+    EXPECT_FLOAT_NEAR(leds.rear_strip.brightness, cfg.rear.brightness);
+    EXPECT_TRUE(leds_get_runtime_status(&leds)->enabled);
+    EXPECT_TRUE(leds_get_runtime_status(&leds)->headlights_enabled);
+    EXPECT_FLOAT_NEAR(leds.status_idle_time, 4.0f);
 
     leds_destroy(&leds);
-    CHECK(leds.led_data == NULL);
-    CHECK(vesc_if_fake_free_calls() == 1);
-    CHECK(led_driver_fake_destroy_calls() == 1);
+    EXPECT_TRUE(leds.led_data == NULL);
+    EXPECT_TRUE(vesc_if_fake_free_calls() == 1);
+    EXPECT_TRUE(led_driver_fake_destroy_calls() == 1);
     return true;
 }
 
@@ -159,18 +159,18 @@ static bool test_leds_runtime_overrides_survive_reconfigure(void) {
 
     leds_set_enabled(&leds, false);
     leds_set_headlights_enabled(&leds, false);
-    CHECK(!leds_get_runtime_status(&leds)->enabled);
-    CHECK(!leds_get_runtime_status(&leds)->headlights_enabled);
+    EXPECT_TRUE(!leds_get_runtime_status(&leds)->enabled);
+    EXPECT_TRUE(!leds_get_runtime_status(&leds)->headlights_enabled);
 
     cfg.on = true;
     cfg.headlights_on = true;
     vesc_if_fake_set_seconds(8.0f);
     leds_configure(&leds, &cfg);
 
-    CHECK(!leds_get_runtime_status(&leds)->enabled);
-    CHECK(!leds_get_runtime_status(&leds)->headlights_enabled);
-    CHECK_FLOAT_NEAR(leds.status_idle_time, 8.0f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_time, 8.0f);
+    EXPECT_TRUE(!leds_get_runtime_status(&leds)->enabled);
+    EXPECT_TRUE(!leds_get_runtime_status(&leds)->headlights_enabled);
+    EXPECT_FLOAT_NEAR(leds.status_idle_time, 8.0f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_time, 8.0f);
 
     leds_destroy(&leds);
     return true;
@@ -180,11 +180,11 @@ static bool test_leds_update_paints_and_fades_running_lights(void) {
     LEDS_UPDATE_FIXTURE(1.0f, STATE_READY);
     update_leds_at(&leds, &state, &motor, FS_BOTH, 1.1f);
 
-    CHECK(led_driver_fake_paint_calls() == 1);
-    CHECK_FLOAT_NEAR(leds.last_updated, 1.1f);
-    CHECK_FLOAT_NEAR(leds.on_off_fade, 0.1f);
-    CHECK_FLOAT_NEAR(leds.left_sensor, 1.0f / 3.0f);
-    CHECK_FLOAT_NEAR(leds.right_sensor, 1.0f / 3.0f);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 1);
+    EXPECT_FLOAT_NEAR(leds.last_updated, 1.1f);
+    EXPECT_FLOAT_NEAR(leds.on_off_fade, 0.1f);
+    EXPECT_FLOAT_NEAR(leds.left_sensor, 1.0f / 3.0f);
+    EXPECT_FLOAT_NEAR(leds.right_sensor, 1.0f / 3.0f);
 
     leds_destroy(&leds);
     return true;
@@ -197,10 +197,10 @@ static bool test_leds_update_is_noop_without_internal_led_data(void) {
     leds_update(&leds, &state, &motor, FS_BOTH);
     leds_status_confirm(&leds);
 
-    CHECK(leds.led_data == NULL);
-    CHECK(led_driver_fake_setup_calls() == 0);
-    CHECK(led_driver_fake_paint_calls() == 0);
-    CHECK(vesc_if_fake_malloc_calls() == 0);
+    EXPECT_TRUE(leds.led_data == NULL);
+    EXPECT_TRUE(led_driver_fake_setup_calls() == 0);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 0);
+    EXPECT_TRUE(vesc_if_fake_malloc_calls() == 0);
 
     leds_destroy(&leds);
     return true;
@@ -213,10 +213,10 @@ static bool test_leds_setup_frees_buffer_when_driver_setup_fails(void) {
     CfgHwLeds hw = default_hw_cfg();
     LEDS_SETUP_FROM_CONFIG();
 
-    CHECK(led_driver_fake_setup_calls() == 1);
-    CHECK(vesc_if_fake_malloc_calls() == 1);
-    CHECK(vesc_if_fake_free_calls() == 1);
-    CHECK(leds.led_data == NULL);
+    EXPECT_TRUE(led_driver_fake_setup_calls() == 1);
+    EXPECT_TRUE(vesc_if_fake_malloc_calls() == 1);
+    EXPECT_TRUE(vesc_if_fake_free_calls() == 1);
+    EXPECT_TRUE(leds.led_data == NULL);
 
     leds_destroy(&leds);
     return true;
@@ -239,26 +239,26 @@ static bool test_leds_setup_respects_strip_order_and_metadata(void) {
 
     LEDS_SETUP_FROM_CONFIG();
 
-    CHECK(leds.led_data != NULL);
-    CHECK(led_driver_fake_setup_calls() == 1);
-    CHECK(vesc_if_fake_malloc_calls() == 1);
+    EXPECT_TRUE(leds.led_data != NULL);
+    EXPECT_TRUE(led_driver_fake_setup_calls() == 1);
+    EXPECT_TRUE(vesc_if_fake_malloc_calls() == 1);
 
-    CHECK(leds.front_strip.data == leds.led_data);
-    CHECK(leds.rear_strip.data == leds.led_data + hw.front.count);
-    CHECK(leds.status_strip.data == leds.led_data + hw.front.count + hw.rear.count);
+    EXPECT_TRUE(leds.front_strip.data == leds.led_data);
+    EXPECT_TRUE(leds.rear_strip.data == leds.led_data + hw.front.count);
+    EXPECT_TRUE(leds.status_strip.data == leds.led_data + hw.front.count + hw.rear.count);
 
-    CHECK(leds.front_strip.length == hw.front.count);
-    CHECK(leds.rear_strip.length == hw.rear.count);
-    CHECK(leds.status_strip.length == hw.status.count);
-    CHECK(leds.front_strip.color_order == LED_COLOR_GRB);
-    CHECK(leds.rear_strip.color_order == LED_COLOR_WRGB);
-    CHECK(leds.status_strip.color_order == LED_COLOR_RGB);
-    CHECK(leds.front_strip.reverse);
-    CHECK(!leds.rear_strip.reverse);
-    CHECK(leds.status_strip.reverse);
+    EXPECT_TRUE(leds.front_strip.length == hw.front.count);
+    EXPECT_TRUE(leds.rear_strip.length == hw.rear.count);
+    EXPECT_TRUE(leds.status_strip.length == hw.status.count);
+    EXPECT_TRUE(leds.front_strip.color_order == LED_COLOR_GRB);
+    EXPECT_TRUE(leds.rear_strip.color_order == LED_COLOR_WRGB);
+    EXPECT_TRUE(leds.status_strip.color_order == LED_COLOR_RGB);
+    EXPECT_TRUE(leds.front_strip.reverse);
+    EXPECT_TRUE(!leds.rear_strip.reverse);
+    EXPECT_TRUE(leds.status_strip.reverse);
 
     for (uint8_t i = 0; i < hw.front.count + hw.rear.count + hw.status.count; ++i) {
-        CHECK(leds.led_data[i] == 0u);
+        EXPECT_TRUE(leds.led_data[i] == 0u);
     }
 
     leds_destroy(&leds);
@@ -269,15 +269,15 @@ static bool test_leds_status_confirm_respects_animation_window(void) {
     LEDS_SETUP_FIXTURE(10.0f);
 
     leds_status_confirm(&leds);
-    CHECK_FLOAT_NEAR(leds.confirm_animation_start, 10.0f);
+    EXPECT_FLOAT_NEAR(leds.confirm_animation_start, 10.0f);
 
     vesc_if_fake_set_seconds(10.5f);
     leds_status_confirm(&leds);
-    CHECK_FLOAT_NEAR(leds.confirm_animation_start, 10.0f);
+    EXPECT_FLOAT_NEAR(leds.confirm_animation_start, 10.0f);
 
     vesc_if_fake_set_seconds(11.0f);
     leds_status_confirm(&leds);
-    CHECK_FLOAT_NEAR(leds.confirm_animation_start, 11.0f);
+    EXPECT_FLOAT_NEAR(leds.confirm_animation_start, 11.0f);
 
     leds_destroy(&leds);
     return true;
@@ -288,11 +288,11 @@ static bool test_leds_startup_state_updates_timestamp_without_painting(void) {
 
     update_leds_at(&leds, &state, &motor, FS_BOTH, 3.5f);
 
-    CHECK_FLOAT_NEAR(leds.last_updated, 3.5f);
-    CHECK_FLOAT_NEAR(leds.on_off_fade, 0.0f);
-    CHECK_FLOAT_NEAR(leds.left_sensor, 0.0f);
-    CHECK_FLOAT_NEAR(leds.right_sensor, 0.0f);
-    CHECK(led_driver_fake_paint_calls() == 0);
+    EXPECT_FLOAT_NEAR(leds.last_updated, 3.5f);
+    EXPECT_FLOAT_NEAR(leds.on_off_fade, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.left_sensor, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.right_sensor, 0.0f);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 0);
 
     leds_destroy(&leds);
     return true;
@@ -301,16 +301,16 @@ static bool test_leds_startup_state_updates_timestamp_without_painting(void) {
 static bool test_leds_disabled_state_paints_disabled_animation_and_resets_fade(void) {
     LEDS_UPDATE_FIXTURE(5.0f, STATE_READY);
     update_leds_at(&leds, &state, &motor, FS_NONE, 5.1f);
-    CHECK_FLOAT_NEAR(leds.on_off_fade, 0.1f);
+    EXPECT_FLOAT_NEAR(leds.on_off_fade, 0.1f);
 
     state.state = STATE_DISABLED;
     update_leds_at(&leds, &state, &motor, FS_NONE, 5.2f);
 
-    CHECK_FLOAT_NEAR(leds.on_off_fade, 0.0f);
-    CHECK(led_driver_fake_paint_calls() == 2);
-    CHECK_FLOAT_NEAR(leds.animation_start, 5.2f);
-    CHECK_FLOAT_NEAR(leds.status_idle_time, 5.2f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_time, 5.2f);
+    EXPECT_FLOAT_NEAR(leds.on_off_fade, 0.0f);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 2);
+    EXPECT_FLOAT_NEAR(leds.animation_start, 5.2f);
+    EXPECT_FLOAT_NEAR(leds.status_idle_time, 5.2f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_time, 5.2f);
 
     leds_destroy(&leds);
     return true;
@@ -322,18 +322,18 @@ static bool test_leds_lifted_ready_board_blends_status_onto_front_strip(void) {
     vesc_if_fake_set_imu(deg2rad(65.0f), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 6.1f);
 
-    CHECK(leds.board_is_upright);
-    CHECK_FLOAT_NEAR(leds.status_on_front_blend, 1.0f);
-    CHECK_FLOAT_NEAR(leds.front_strip.brightness, cfg.front.brightness - 0.1f);
-    CHECK_FLOAT_NEAR(leds.rear_strip.brightness, cfg.rear.brightness - 0.1f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_time, 6.1f);
+    EXPECT_TRUE(leds.board_is_upright);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_blend, 1.0f);
+    EXPECT_FLOAT_NEAR(leds.front_strip.brightness, cfg.front.brightness - 0.1f);
+    EXPECT_FLOAT_NEAR(leds.rear_strip.brightness, cfg.rear.brightness - 0.1f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_time, 6.1f);
 
     vesc_if_fake_set_imu(deg2rad(45.0f), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 6.2f);
 
-    CHECK(!leds.board_is_upright);
-    CHECK_FLOAT_NEAR(leds.status_on_front_blend, 0.9f);
-    CHECK_FLOAT_NEAR(leds.animation_start, 6.2f);
+    EXPECT_TRUE(!leds.board_is_upright);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_blend, 0.9f);
+    EXPECT_FLOAT_NEAR(leds.animation_start, 6.2f);
 
     leds_destroy(&leds);
     return true;
@@ -342,15 +342,15 @@ static bool test_leds_lifted_ready_board_blends_status_onto_front_strip(void) {
 static bool test_leds_running_state_hides_sensor_indicators_when_configured(void) {
     LEDS_UPDATE_FIXTURE(7.0f, STATE_READY);
     update_leds_at(&leds, &state, &motor, FS_BOTH, 7.1f);
-    CHECK_FLOAT_NEAR(leds.left_sensor, 1.0f / 3.0f);
-    CHECK_FLOAT_NEAR(leds.right_sensor, 1.0f / 3.0f);
+    EXPECT_FLOAT_NEAR(leds.left_sensor, 1.0f / 3.0f);
+    EXPECT_FLOAT_NEAR(leds.right_sensor, 1.0f / 3.0f);
 
     state.state = STATE_RUNNING;
     update_leds_at(&leds, &state, &motor, FS_BOTH, 7.2f);
 
-    CHECK_FLOAT_NEAR(leds.left_sensor, 0.0f);
-    CHECK_FLOAT_NEAR(leds.right_sensor, 0.0f);
-    CHECK_FLOAT_NEAR(leds.split_distance, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.left_sensor, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.right_sensor, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.split_distance, 0.0f);
 
     leds_destroy(&leds);
     return true;
@@ -360,36 +360,36 @@ static bool test_leds_running_entry_direction_and_headlight_transition(void) {
     LEDS_UPDATE_FIXTURE(15.0f, STATE_READY);
 
     update_leds_at(&leds, &state, &motor, FS_NONE, 15.1f);
-    CHECK(!leds.headlights_on);
-    CHECK(leds.direction_forward);
-    CHECK(led_driver_fake_paint_calls() == 1);
+    EXPECT_TRUE(!leds.headlights_on);
+    EXPECT_TRUE(leds.direction_forward);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 1);
 
     state.state = STATE_RUNNING;
     vesc_if_fake_set_imu(deg2rad(-3.0f), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     vesc_if_fake_set_motor_telemetry(0, 0, 2.5f, 0, 0, 0, 0, 50.0f, 25.0f, 25.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 15.2f);
 
-    CHECK(!leds.direction_forward);
-    CHECK_FLOAT_NEAR(leds.dir_trans.split, -1.0f);
-    CHECK_FLOAT_NEAR(leds.headlights_trans.split, -1.0f);
-    CHECK_FLOAT_NEAR(leds.headlights_time, 15.2f);
-    CHECK(!leds.headlights_on);
-    CHECK(leds.front_time_target == &cfg.taillights);
-    CHECK(leds.rear_time_target == &cfg.headlights);
+    EXPECT_TRUE(!leds.direction_forward);
+    EXPECT_FLOAT_NEAR(leds.dir_trans.split, -1.0f);
+    EXPECT_FLOAT_NEAR(leds.headlights_trans.split, -1.0f);
+    EXPECT_FLOAT_NEAR(leds.headlights_time, 15.2f);
+    EXPECT_TRUE(!leds.headlights_on);
+    EXPECT_TRUE(leds.front_time_target == &cfg.taillights);
+    EXPECT_TRUE(leds.rear_time_target == &cfg.headlights);
 
     vesc_if_fake_set_motor_telemetry(0, 0, 3.5f, 0, 0, 0, 0, 50.0f, 25.0f, 25.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 15.8f);
-    CHECK(!leds.headlights_on);
-    CHECK_FLOAT_NEAR(leds.headlights_trans.split, 0.2f);
+    EXPECT_TRUE(!leds.headlights_on);
+    EXPECT_FLOAT_NEAR(leds.headlights_trans.split, 0.2f);
 
     vesc_if_fake_set_motor_telemetry(0, 0, 4.0f, 0, 0, 0, 0, 50.0f, 25.0f, 25.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 16.3f);
-    CHECK(leds.headlights_on);
-    CHECK_FLOAT_NEAR(leds.headlights_time, 0.0f);
-    CHECK_FLOAT_NEAR(leds.headlights_trans.split, 1.0f);
-    CHECK_FLOAT_NEAR(leds.split_distance, 4.0f);
-    CHECK(leds.front_bar == &cfg.taillights);
-    CHECK(leds.rear_bar == &cfg.headlights);
+    EXPECT_TRUE(leds.headlights_on);
+    EXPECT_FLOAT_NEAR(leds.headlights_time, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.headlights_trans.split, 1.0f);
+    EXPECT_FLOAT_NEAR(leds.split_distance, 4.0f);
+    EXPECT_TRUE(leds.front_bar == &cfg.taillights);
+    EXPECT_TRUE(leds.rear_bar == &cfg.headlights);
 
     leds_destroy(&leds);
     return true;
@@ -403,28 +403,28 @@ static bool test_leds_running_transition_repaints_each_tick(void) {
     LEDS_UPDATE_FROM_CONFIG(STATE_READY);
 
     update_leds_at(&leds, &state, &motor, FS_NONE, 20.1f);
-    CHECK(led_driver_fake_paint_calls() == 1);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 1);
 
     state.state = STATE_RUNNING;
     vesc_if_fake_set_imu(deg2rad(-4.0f), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     vesc_if_fake_set_motor_telemetry(0, 0, 3.0f, 0, 0, 0, 0, 50.0f, 25.0f, 25.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 20.2f);
-    CHECK(led_driver_fake_paint_calls() == 2);
-    CHECK_FLOAT_NEAR(leds.dir_trans.split, -1.0f);
-    CHECK_FLOAT_NEAR(leds.headlights_trans.split, -1.0f);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 2);
+    EXPECT_FLOAT_NEAR(leds.dir_trans.split, -1.0f);
+    EXPECT_FLOAT_NEAR(leds.headlights_trans.split, -1.0f);
 
     vesc_if_fake_set_motor_telemetry(0, 0, 3.4f, 0, 0, 0, 0, 50.0f, 25.0f, 25.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 20.4f);
-    CHECK(led_driver_fake_paint_calls() == 3);
-    CHECK(leds.headlights_trans.split > -1.0f);
-    CHECK(leds.headlights_trans.split < 1.0f);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 3);
+    EXPECT_TRUE(leds.headlights_trans.split > -1.0f);
+    EXPECT_TRUE(leds.headlights_trans.split < 1.0f);
 
     float split_after_first_transition_tick = leds.headlights_trans.split;
     vesc_if_fake_set_motor_telemetry(0, 0, 3.8f, 0, 0, 0, 0, 50.0f, 25.0f, 25.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 20.6f);
-    CHECK(led_driver_fake_paint_calls() == 4);
-    CHECK(leds.headlights_trans.split > split_after_first_transition_tick);
-    CHECK(leds.headlights_trans.split < 1.0f);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 4);
+    EXPECT_TRUE(leds.headlights_trans.split > split_after_first_transition_tick);
+    EXPECT_TRUE(leds.headlights_trans.split < 1.0f);
 
     leds_destroy(&leds);
     return true;
@@ -455,15 +455,15 @@ static bool test_leds_cipher_transition_golden_colors(void) {
     vesc_if_fake_set_motor_telemetry(0, 0, 3.0f, 0, 0, 0, 0, 50.0f, 25.0f, 25.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 30.6f);
 
-    CHECK(leds.front_strip.length == 3);
-    CHECK(leds.rear_strip.length == 3);
-    CHECK(leds.front_strip.data[0] == 0x00000000u);
-    CHECK(leds.front_strip.data[1] == 0x00274d2cu);
-    CHECK(leds.front_strip.data[2] == 0x00264c23u);
-    CHECK(leds.rear_strip.data[0] == 0x00264c23u);
-    CHECK(leds.rear_strip.data[1] == 0x00274d2cu);
-    CHECK(leds.rear_strip.data[2] == 0x00000000u);
-    CHECK(led_driver_fake_paint_calls() == 3);
+    EXPECT_TRUE(leds.front_strip.length == 3);
+    EXPECT_TRUE(leds.rear_strip.length == 3);
+    EXPECT_TRUE(leds.front_strip.data[0] == 0x00000000u);
+    EXPECT_TRUE(leds.front_strip.data[1] == 0x00274d2cu);
+    EXPECT_TRUE(leds.front_strip.data[2] == 0x00264c23u);
+    EXPECT_TRUE(leds.rear_strip.data[0] == 0x00264c23u);
+    EXPECT_TRUE(leds.rear_strip.data[1] == 0x00274d2cu);
+    EXPECT_TRUE(leds.rear_strip.data[2] == 0x00000000u);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 3);
 
     leds_destroy(&leds);
     return true;
@@ -475,11 +475,11 @@ static bool test_leds_setup_rejects_front_rear_count_over_limit(void) {
     hw.rear.count = 1;
     LEDS_SETUP_FROM_CONFIG();
 
-    CHECK(leds.led_data == NULL);
-    CHECK(led_driver_fake_setup_calls() == 0);
-    CHECK(vesc_if_fake_malloc_calls() == 0);
-    CHECK(leds.front_strip.length == LEDS_FRONT_AND_REAR_COUNT_MAX);
-    CHECK(leds.rear_strip.length == 1);
+    EXPECT_TRUE(leds.led_data == NULL);
+    EXPECT_TRUE(led_driver_fake_setup_calls() == 0);
+    EXPECT_TRUE(vesc_if_fake_malloc_calls() == 0);
+    EXPECT_TRUE(leds.front_strip.length == LEDS_FRONT_AND_REAR_COUNT_MAX);
+    EXPECT_TRUE(leds.rear_strip.length == 1);
 
     leds_destroy(&leds);
     return true;
@@ -488,14 +488,14 @@ static bool test_leds_setup_rejects_front_rear_count_over_limit(void) {
 static bool test_leds_runtime_enabled_override_fades_lights_off(void) {
     LEDS_UPDATE_FIXTURE(8.0f, STATE_READY);
     update_leds_at(&leds, &state, &motor, FS_NONE, 8.1f);
-    CHECK_FLOAT_NEAR(leds.on_off_fade, 0.1f);
+    EXPECT_FLOAT_NEAR(leds.on_off_fade, 0.1f);
 
     leds_set_enabled(&leds, false);
     update_leds_at(&leds, &state, &motor, FS_NONE, 8.2f);
 
-    CHECK_FLOAT_NEAR(leds.on_off_fade, 0.0f);
-    CHECK(led_driver_fake_paint_calls() == 2);
-    CHECK(!leds_get_runtime_status(&leds)->enabled);
+    EXPECT_FLOAT_NEAR(leds.on_off_fade, 0.0f);
+    EXPECT_TRUE(led_driver_fake_paint_calls() == 2);
+    EXPECT_TRUE(!leds_get_runtime_status(&leds)->enabled);
 
     leds_destroy(&leds);
     return true;
@@ -503,13 +503,13 @@ static bool test_leds_runtime_enabled_override_fades_lights_off(void) {
 
 static bool test_leds_headlights_runtime_override_uses_off_status_brightness(void) {
     LEDS_UPDATE_FIXTURE(9.0f, STATE_READY);
-    CHECK_FLOAT_NEAR(leds.status_strip.brightness, cfg.status.brightness_headlights_on);
+    EXPECT_FLOAT_NEAR(leds.status_strip.brightness, cfg.status.brightness_headlights_on);
 
     leds_set_headlights_enabled(&leds, false);
     update_leds_at(&leds, &state, &motor, FS_NONE, 9.1f);
 
-    CHECK(!leds_get_runtime_status(&leds)->headlights_enabled);
-    CHECK_FLOAT_NEAR(leds.status_strip.brightness, cfg.status.brightness_headlights_on - 0.1f);
+    EXPECT_TRUE(!leds_get_runtime_status(&leds)->headlights_enabled);
+    EXPECT_FLOAT_NEAR(leds.status_strip.brightness, cfg.status.brightness_headlights_on - 0.1f);
 
     leds_destroy(&leds);
     return true;
@@ -519,15 +519,15 @@ static bool test_leds_status_idle_blend_starts_after_timeout_and_resets_on_senso
     LEDS_UPDATE_FIXTURE(12.0f, STATE_READY);
 
     update_leds_at(&leds, &state, &motor, FS_NONE, 12.1f);
-    CHECK_FLOAT_NEAR(leds.status_idle_time, 12.1f);
+    EXPECT_FLOAT_NEAR(leds.status_idle_time, 12.1f);
 
     update_leds_at(&leds, &state, &motor, FS_NONE, 14.2f);
-    CHECK_FLOAT_NEAR(leds.status_idle_blend, 0.1f);
-    CHECK_FLOAT_NEAR(leds.status_animation_start, 14.2f);
+    EXPECT_FLOAT_NEAR(leds.status_idle_blend, 0.1f);
+    EXPECT_FLOAT_NEAR(leds.status_animation_start, 14.2f);
 
     update_leds_at(&leds, &state, &motor, FS_LEFT, 14.3f);
-    CHECK_FLOAT_NEAR(leds.status_idle_time, 14.3f);
-    CHECK_FLOAT_NEAR(leds.status_idle_blend, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.status_idle_time, 14.3f);
+    EXPECT_FLOAT_NEAR(leds.status_idle_blend, 0.0f);
 
     leds_destroy(&leds);
     return true;
@@ -538,21 +538,21 @@ static bool test_leds_status_on_front_idle_blend_edges(void) {
 
     vesc_if_fake_set_imu(deg2rad(65.0f), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 22.1f);
-    CHECK(leds.board_is_upright);
-    CHECK_FLOAT_NEAR(leds.status_on_front_blend, 1.0f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_time, 22.1f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_blend, 0.0f);
+    EXPECT_TRUE(leds.board_is_upright);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_blend, 1.0f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_time, 22.1f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_blend, 0.0f);
 
     update_leds_at(&leds, &state, &motor, FS_NONE, 25.2f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_blend, 0.1f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_blend, 0.1f);
 
     update_leds_at(&leds, &state, &motor, FS_RIGHT, 25.3f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_time, 25.3f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_blend, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_time, 25.3f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_blend, 0.0f);
 
     cfg.lights_off_when_lifted = false;
     update_leds_at(&leds, &state, &motor, FS_NONE, 28.4f);
-    CHECK_FLOAT_NEAR(leds.status_on_front_idle_blend, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.status_on_front_idle_blend, 0.0f);
 
     leds_destroy(&leds);
     return true;
@@ -564,21 +564,21 @@ static bool test_leds_status_battery_bar_edges(void) {
     vesc_if_fake_set_battery_level(0.5f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 20.1f);
 
-    CHECK(leds.status_strip.data[0] != 0u);
-    CHECK(leds.status_strip.data[1] != 0u);
-    CHECK(leds.status_strip.data[0] == leds.status_strip.data[1]);
-    CHECK(leds.status_strip.data[2] == 0u);
-    CHECK(leds.status_strip.data[3] == 0u);
+    EXPECT_TRUE(leds.status_strip.data[0] != 0u);
+    EXPECT_TRUE(leds.status_strip.data[1] != 0u);
+    EXPECT_TRUE(leds.status_strip.data[0] == leds.status_strip.data[1]);
+    EXPECT_TRUE(leds.status_strip.data[2] == 0u);
+    EXPECT_TRUE(leds.status_strip.data[3] == 0u);
 
     uint32_t mid_battery_first_led = leds.status_strip.data[0];
     vesc_if_fake_set_battery_level(0.0f);
     update_leds_at(&leds, &state, &motor, FS_NONE, 20.2f);
 
-    CHECK(leds.status_strip.data[0] != 0u);
-    CHECK(leds.status_strip.data[0] != mid_battery_first_led);
-    CHECK(leds.status_strip.data[1] == 0u);
-    CHECK(leds.status_strip.data[2] == 0u);
-    CHECK(leds.status_strip.data[3] == 0u);
+    EXPECT_TRUE(leds.status_strip.data[0] != 0u);
+    EXPECT_TRUE(leds.status_strip.data[0] != mid_battery_first_led);
+    EXPECT_TRUE(leds.status_strip.data[1] == 0u);
+    EXPECT_TRUE(leds.status_strip.data[2] == 0u);
+    EXPECT_TRUE(leds.status_strip.data[3] == 0u);
 
     leds_destroy(&leds);
     return true;
@@ -593,25 +593,25 @@ static bool test_leds_status_utilization_hysteresis_edges(void) {
 
     motor.duty_cycle.value = 0.54f;
     update_leds_at(&leds, &state, &motor, FS_NONE, 18.1f);
-    CHECK_FLOAT_NEAR(leds.status_utilization_blend, 5.0f / LEDS_REFRESH_RATE);
+    EXPECT_FLOAT_NEAR(leds.status_utilization_blend, 5.0f / LEDS_REFRESH_RATE);
 
     motor.duty_cycle.value = 0.405f;
     update_leds_at(&leds, &state, &motor, FS_NONE, 18.2f);
-    CHECK_FLOAT_NEAR(leds.status_utilization_blend, 5.0f / LEDS_REFRESH_RATE);
+    EXPECT_FLOAT_NEAR(leds.status_utilization_blend, 5.0f / LEDS_REFRESH_RATE);
 
     motor.duty_cycle.value = 0.35f;
     update_leds_at(&leds, &state, &motor, FS_NONE, 18.3f);
-    CHECK_FLOAT_NEAR(leds.status_utilization_blend, 0.0f);
+    EXPECT_FLOAT_NEAR(leds.status_utilization_blend, 0.0f);
 
     motor.duty_cycle.value = 0.0f;
     motor.motor_current_saturation = 0.9f;
     update_leds_at(&leds, &state, &motor, FS_NONE, 18.4f);
-    CHECK_FLOAT_NEAR(leds.status_utilization_blend, 5.0f / LEDS_REFRESH_RATE);
+    EXPECT_FLOAT_NEAR(leds.status_utilization_blend, 5.0f / LEDS_REFRESH_RATE);
 
     motor.motor_current_saturation = 0.0f;
     motor.battery_current_saturation = 0.95f;
     update_leds_at(&leds, &state, &motor, FS_NONE, 18.5f);
-    CHECK_FLOAT_NEAR(leds.status_utilization_blend, 10.0f / LEDS_REFRESH_RATE);
+    EXPECT_FLOAT_NEAR(leds.status_utilization_blend, 10.0f / LEDS_REFRESH_RATE);
 
     leds_destroy(&leds);
     return true;
