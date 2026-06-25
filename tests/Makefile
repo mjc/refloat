@@ -122,12 +122,32 @@ check-qml-behavior:
 
 check-smoke: check-qml-behavior
 
+print-test-sources:
+	@printf '%s\n' $(TEST_SOURCES)
+
+print-main-sources:
+	@printf '%s\n' $(MAIN_SOURCES)
+
+print-leds-sources:
+	@printf '%s\n' $(LEDS_SOURCES)
+
+print-test-objects:
+	@printf '%s\n' $(TEST_OBJECTS)
+
+print-main-objects:
+	@printf '%s\n' $(MAIN_OBJECTS)
+
+print-leds-objects:
+	@printf '%s\n' $(LEDS_OBJECTS)
+
 clean:
 	rm -rf $(BUILD_DIR) $(TEST_BIN) $(LEDS_TEST_BIN) $(MAIN_TEST_BIN)
 
 -include $(DEPFILES)
 
 .PHONY: all check check-qml-behavior check-smoke clean sync-build-artifacts
+.PHONY: print-test-sources print-main-sources print-leds-sources
+.PHONY: print-test-objects print-main-objects print-leds-objects
 .PHONY: generated_conf check-main
 
 check-main: $(MAIN_TEST_BIN)

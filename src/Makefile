@@ -68,6 +68,15 @@ conf/conf_general.h: FORCE conf/conf_general.h.in ../package_name ../version $(G
 
 FORCE:
 
-.PHONY: FORCE
+.PHONY: FORCE print-sources print-objects print-artifacts
+
+print-sources:
+	@printf '%s\n' $(SOURCES)
+
+print-objects:
+	@printf '%s\n' $(OBJECTS)
+
+print-artifacts:
+	@printf '%s\n' $(TARGET_ELF) $(TARGET_BIN) $(TARGET_LISP) $(TARGET_LIST)
 
 -include $(DEPS)
