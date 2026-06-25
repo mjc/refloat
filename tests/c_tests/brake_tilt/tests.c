@@ -10,12 +10,23 @@ static RefloatConfig default_brake_tilt_cfg(void) {
     };
 }
 
+static RefloatConfig default_brake_tilt_booster_cfg(void) {
+    return (RefloatConfig) {
+        .booster_current = 10.0f,
+        .booster_angle = 2.0f,
+        .booster_ramp = 2.0f,
+        .brkbooster_current = 5.0f,
+        .brkbooster_angle = 2.0f,
+        .brkbooster_ramp = 2.0f,
+    };
+}
+
 static bool test_booster_and_brake_tilt_branch_cases(void) {
     Booster booster;
     booster_init(&booster);
     booster_configure(&booster, 100.0f);
 
-    RefloatConfig cfg = default_booster_cfg();
+    RefloatConfig cfg = default_brake_tilt_booster_cfg();
 
     MotorData md = {.abs_erpm = 0.0f, .braking = false};
     booster_update(&booster, &md, &cfg, 2.5f);
