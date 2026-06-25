@@ -33,6 +33,11 @@ typedef struct {
     size_t request_len;
 } MainGnssInvokeGuard;
 
+typedef struct {
+    lib_info info;
+    Data *data;
+} MainGnssFixture;
+
 static bool run_main_gnss_invoke(void *ctx) {
     MainGnssInvokeGuard *guard = ctx;
     vesc_if_fake_invoke_app_data_handler(guard->request, guard->request_len);
@@ -44,15 +49,19 @@ static bool main_gnss_invoke_without_signal(uint8_t *request, size_t request_len
     return test_expect_no_signal(SIGSEGV, run_main_gnss_invoke, &guard);
 }
 
-static bool main_gnss_start(lib_info *info, Data **data) {
-    MainProtocolFixture fixture = {0};
-    EXPECT_TRUE(main_protocol_fixture_start(&fixture));
-    *info = fixture.info;
-    *data = fixture.data;
-    (*data)->float_conf.hardware.leds.mode = LED_MODE_OFF;
-    (*data)->data_record.enabled = false;
-    (*data)->time.now = 123456u;
+static bool main_gnss_fixture_start(MainGnssFixture *fixture) {
+    MainProtocolFixture protocol_fixture = {0};
+    EXPECT_TRUE(main_protocol_fixture_start(&protocol_fixture));
+    fixture->info = protocol_fixture.info;
+    fixture->data = protocol_fixture.data;
+    fixture->data->float_conf.hardware.leds.mode = LED_MODE_OFF;
+    fixture->data->data_record.enabled = false;
+    fixture->data->time.now = 123456u;
     return true;
+}
+
+static void main_gnss_fixture_stop(MainGnssFixture *fixture) {
+    main_protocol_stop_info(&fixture->info);
 }
 
 static uint32_t main_gnss_mask2(void) {
@@ -99,10 +108,8 @@ static bool check_main_realtime_gnss_prefix(
 static bool check_main_info_optional_gnss(bool missing_hook) {
     uint8_t info_request[] = {101, COMMAND_INFO, 2, 0};
 
-    lib_info info = {0};
-    Data *data = NULL;
-    EXPECT_TRUE(main_gnss_start(&info, &data));
-    (void) data;
+    MainGnssFixture fixture;
+    EXPECT_TRUE(main_gnss_fixture_start(&fixture));
     if (missing_hook) {
         vesc_if_fake_set_mc_gnss_missing();
     } else {
@@ -113,7 +120,7 @@ static bool check_main_info_optional_gnss(bool missing_hook) {
     size_t len = 0;
     const uint8_t *payload = vesc_if_fake_last_app_data(&len);
     EXPECT_TRUE(check_main_info_gnss_flags(payload, len, 0u));
-    main_protocol_stop_info(&info);
+    main_gnss_fixture_stop(&fixture);
     return true;
 }
 
@@ -121,9 +128,8 @@ static bool check_main_realtime_optional_gnss(bool missing_hook) {
     uint8_t rt_request[11] = {0};
     main_gnss_realtime_request(rt_request, 1);
 
-    lib_info info = {0};
-    Data *data = NULL;
-    EXPECT_TRUE(main_gnss_start(&info, &data));
+    MainGnssFixture fixture;
+    EXPECT_TRUE(main_gnss_fixture_start(&fixture));
     if (missing_hook) {
         vesc_if_fake_set_mc_gnss_missing();
     } else {
@@ -136,15 +142,14 @@ static bool check_main_realtime_optional_gnss(bool missing_hook) {
     EXPECT_TRUE(payload != NULL);
     EXPECT_EQ_U32(len, 15u);
     int32_t index = 0;
-    EXPECT_TRUE(check_main_realtime_gnss_prefix(payload, len, 1, data->time.now, &index));
-    main_protocol_stop_info(&info);
+    EXPECT_TRUE(check_main_realtime_gnss_prefix(payload, len, 1, fixture.data->time.now, &index));
+    main_gnss_fixture_stop(&fixture);
     return true;
 }
 
 static bool test_main_gnss_protocol(void) {
-    lib_info info = {0};
-    Data *d = NULL;
-    EXPECT_TRUE(main_gnss_start(&info, &d));
+    MainGnssFixture fixture;
+    EXPECT_TRUE(main_gnss_fixture_start(&fixture));
 
     uint8_t info_request[] = {101, COMMAND_INFO, 2, 0};
     size_t len = 0;
@@ -173,7 +178,7 @@ static bool test_main_gnss_protocol(void) {
     payload = vesc_if_fake_last_app_data(&len);
     EXPECT_EQ_U32(len, 41u);
     int32_t index = 0;
-    EXPECT_TRUE(check_main_realtime_gnss_prefix(payload, len, 0, d->time.now, &index));
+    EXPECT_TRUE(check_main_realtime_gnss_prefix(payload, len, 0, fixture.data->time.now, &index));
     EXPECT_FLOAT_NEAR(buffer_get_float64_be(payload, &index), 12.3456789);
     EXPECT_FLOAT_NEAR(buffer_get_float64_be(payload, &index), -98.7654321);
     EXPECT_EQ_U32(buffer_get_uint16(payload, &index), to_float16(123.4f));
@@ -190,7 +195,7 @@ static bool test_main_gnss_protocol(void) {
 
     payload = vesc_if_fake_last_app_data(&len);
     EXPECT_EQ_U32(len, 47u);
-    EXPECT_TRUE(check_main_realtime_gnss_prefix(payload, len, 1, d->time.now, &index));
+    EXPECT_TRUE(check_main_realtime_gnss_prefix(payload, len, 1, fixture.data->time.now, &index));
     EXPECT_FLOAT_NEAR(buffer_get_float64_be(payload, &index), 12.3456789);
     EXPECT_FLOAT_NEAR(buffer_get_float64_be(payload, &index), -98.7654321);
     EXPECT_FLOAT_NEAR(buffer_get_float32_auto(payload, &index), 123.4f);
@@ -205,7 +210,7 @@ static bool test_main_gnss_protocol(void) {
     vesc_if_fake_invoke_app_data_handler(short_request, sizeof(short_request));
     EXPECT_EQ_U32(vesc_if_fake_mc_gnss_calls(), gnss_calls);
 
-    main_protocol_stop_info(&info);
+    main_gnss_fixture_stop(&fixture);
     return true;
 }
 
