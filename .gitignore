@@ -1,6 +1,11 @@
 compile_commands.json
+build/
 package_README-gen.md
 ui.qml
+
+tests/refloat-c-tests
+tests/refloat-led-tests
+tests/refloat-main-tests
 
 *.bin
 *.d

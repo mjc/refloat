@@ -1,0 +1,60 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "host",
+      "displayName": "Host C++ Tests",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/host",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "REFLOAT_STRICT_WARNINGS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "host",
+      "configurePreset": "host"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "host",
+      "configurePreset": "host",
+      "filter": {
+        "include": {
+          "label": "host"
+        }
+      },
+      "execution": {
+        "noTestsAction": "error"
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "host",
+      "displayName": "Host C++ Test Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "host"
+        },
+        {
+          "type": "build",
+          "name": "host"
+        },
+        {
+          "type": "test",
+          "name": "host"
+        }
+      ]
+    }
+  ]
+}

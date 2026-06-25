@@ -49,5 +49,13 @@ For macOS, the path to VESC Tool when installed using the official installer is 
 make VESC_TOOL="/Applications/VESC Tool.app/Contents/MacOS/VESC Tool"
 ```
 
+### CMake demo
+There is also an experimental CMake harness for trying a modern C++ host-test
+workflow against the existing C sources. It expects CMake 3.25+, Ninja,
+Catch2 3, `make`, and `vesc_tool` on `PATH`:
+```sh
+cmake --workflow --preset host
+```
+
 ## Documentation
 [Development Documentation](doc/index.md)
