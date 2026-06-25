@@ -20,6 +20,7 @@ CONF_GEN_SOURCES = conf/confparser.c conf/confxml.c
 CONF_GEN_FILES = $(CONF_GEN_HEADERS) $(CONF_GEN_SOURCES)
 SOURCES = $(REFLOAT_SOURCES) $(CONF_GEN_SOURCES) conf/buffer.c
 DEPS = $(SOURCES:.c=.d)
+TRACKED_BUILD_ARTIFACTS = $(sort $(SOURCES:.c=.so) $(DEPS))
 
 ADD_TO_CLEAN = $(CONF_GEN_FILES) $(DEPS) conf/conf_general.h
 
@@ -37,6 +38,18 @@ $(CONF_GEN_FILES) &: conf/settings.xml
 	$(VESC_TOOL) --xmlConfToCode conf/settings.xml
 	# !!! make xml config loading in vesc_tool work with LTO !!!
 	sed -i "s/^uint8_t data_/__attribute__((used)) uint8_t data_/g" conf/confxml.c
+
+sync-build-artifacts:
+	@find . -type f \( -name '*.so' -o -name '*.d' \) -print | \
+	while IFS= read -r path; do \
+		rel=$${path#./}; \
+		case " $(TRACKED_BUILD_ARTIFACTS) " in \
+			*" $$rel "*) ;; \
+			*) rm -f "$$path" ;; \
+		esac; \
+	done
+
+$(OBJECTS): | sync-build-artifacts
 
 PACKAGE_NAME := $(shell sed -n '1s/^\(.\{0,20\}\).*/\1/p' ../package_name)
 VERSION := $(shell sed -n '1p' ../version)
@@ -65,7 +78,7 @@ conf/conf_general.h: FORCE conf/conf_general.h.in ../package_name ../version $(G
 
 FORCE:
 
-.PHONY: FORCE print-sources print-objects print-artifacts help
+.PHONY: FORCE sync-build-artifacts print-sources print-objects print-artifacts help
 
 help:
 	@printf '%s\n' \
