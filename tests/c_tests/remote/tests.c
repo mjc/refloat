@@ -237,11 +237,11 @@ static bool test_remote_rejects_invalid_deadband_config(void) {
     fixture.time.now += 1u;
     remote_input(&fixture.remote, &fixture.time, &cfg);
 
-    EXPECT_TRUE(isfinite(fixture.remote.input));
-    EXPECT_TRUE(isfinite(fixture.remote.move_speed) || isnan(fixture.remote.move_speed));
-    EXPECT_TRUE(fabsf(fixture.remote.input) <= 1.0f);
+    RED_EXPECT_TRUE(isfinite(fixture.remote.input));
+    RED_EXPECT_TRUE(isfinite(fixture.remote.move_speed) || isnan(fixture.remote.move_speed));
+    RED_EXPECT_TRUE(fabsf(fixture.remote.input) <= 1.0f);
     if (isfinite(fixture.remote.move_speed)) {
-        EXPECT_TRUE(fabsf(fixture.remote.move_speed) <= cfg.remote.max_move_speed);
+        RED_EXPECT_TRUE(fabsf(fixture.remote.move_speed) <= cfg.remote.max_move_speed);
     }
 
     cfg.inputtilt_deadband = 1.5f;
@@ -249,11 +249,11 @@ static bool test_remote_rejects_invalid_deadband_config(void) {
     fixture.time.now += 1u;
     remote_input(&fixture.remote, &fixture.time, &cfg);
 
-    EXPECT_TRUE(isfinite(fixture.remote.input));
-    EXPECT_TRUE(isfinite(fixture.remote.move_speed) || isnan(fixture.remote.move_speed));
-    EXPECT_TRUE(fabsf(fixture.remote.input) <= 1.0f);
+    RED_EXPECT_TRUE(isfinite(fixture.remote.input));
+    RED_EXPECT_TRUE(isfinite(fixture.remote.move_speed) || isnan(fixture.remote.move_speed));
+    RED_EXPECT_TRUE(fabsf(fixture.remote.input) <= 1.0f);
     if (isfinite(fixture.remote.move_speed)) {
-        EXPECT_TRUE(fabsf(fixture.remote.move_speed) <= cfg.remote.max_move_speed);
+        RED_EXPECT_TRUE(fabsf(fixture.remote.move_speed) <= cfg.remote.max_move_speed);
     }
 
     return true;
@@ -266,19 +266,19 @@ static bool test_remote_move_torque_nonfinite_dt(void) {
     fixture.remote.move_pid_i = 1.0f;
 
     float torque = remote_get_move_torque(&fixture.remote, 1.0f, 0.0f);
-    EXPECT_TRUE(isfinite(torque));
-    EXPECT_TRUE(isfinite(fixture.remote.move_pid_i));
-    EXPECT_FLOAT_NEAR(fixture.remote.move_pid_i, 1.0f);
+    RED_EXPECT_TRUE(isfinite(torque));
+    RED_EXPECT_TRUE(isfinite(fixture.remote.move_pid_i));
+    RED_EXPECT_FLOAT_NEAR(fixture.remote.move_pid_i, 1.0f);
 
     torque = remote_get_move_torque(&fixture.remote, 1.0f, -0.02f);
-    EXPECT_TRUE(isfinite(torque));
-    EXPECT_TRUE(isfinite(fixture.remote.move_pid_i));
-    EXPECT_FLOAT_NEAR(fixture.remote.move_pid_i, 1.0f);
+    RED_EXPECT_TRUE(isfinite(torque));
+    RED_EXPECT_TRUE(isfinite(fixture.remote.move_pid_i));
+    RED_EXPECT_FLOAT_NEAR(fixture.remote.move_pid_i, 1.0f);
 
     torque = remote_get_move_torque(&fixture.remote, 1.0f, NAN);
-    EXPECT_TRUE(isfinite(torque));
-    EXPECT_TRUE(isfinite(fixture.remote.move_pid_i));
-    EXPECT_FLOAT_NEAR(fixture.remote.move_pid_i, 1.0f);
+    RED_EXPECT_TRUE(isfinite(torque));
+    RED_EXPECT_TRUE(isfinite(fixture.remote.move_pid_i));
+    RED_EXPECT_FLOAT_NEAR(fixture.remote.move_pid_i, 1.0f);
 
     return true;
 }

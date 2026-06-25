@@ -160,7 +160,7 @@ static bool test_bms_startup_grace_waits_for_first_sample(void) {
     BmsFixture fixture;
     bms_fixture_start(&fixture, 100000u);
     bms_update(&fixture.bms, &fixture.cfg, &fixture.time);
-    EXPECT_TRUE(fixture.bms.fault_mask == BMSF_NONE);
+    RED_EXPECT_TRUE(fixture.bms.fault_mask == BMSF_NONE);
 
     return true;
 }
@@ -170,14 +170,14 @@ static bool test_bms_is_fault_none_is_false(void) {
     bms_fixture_start(&fixture, 0u);
 
     fixture.bms.fault_mask = BMSF_NONE;
-    EXPECT_TRUE(!bms_is_fault(&fixture.bms, BMSF_NONE));
+    RED_EXPECT_TRUE(!bms_is_fault(&fixture.bms, BMSF_NONE));
 
     fixture.bms.fault_mask = 0xffffffffu;
-    EXPECT_TRUE(!bms_is_fault(&fixture.bms, BMSF_NONE));
-    EXPECT_TRUE(!bms_is_fault(&fixture.bms, (BMSFaultCode) 8));
-    EXPECT_TRUE(!bms_is_fault(&fixture.bms, (BMSFaultCode) 99));
-    EXPECT_TRUE(bms_is_fault(&fixture.bms, BMSF_CONNECTION));
-    EXPECT_TRUE(bms_is_fault(&fixture.bms, BMSF_CELL_BALANCE));
+    RED_EXPECT_TRUE(!bms_is_fault(&fixture.bms, BMSF_NONE));
+    RED_EXPECT_TRUE(!bms_is_fault(&fixture.bms, (BMSFaultCode) 8));
+    RED_EXPECT_TRUE(!bms_is_fault(&fixture.bms, (BMSFaultCode) 99));
+    RED_EXPECT_TRUE(bms_is_fault(&fixture.bms, BMSF_CONNECTION));
+    RED_EXPECT_TRUE(bms_is_fault(&fixture.bms, BMSF_CELL_BALANCE));
 
     return true;
 }

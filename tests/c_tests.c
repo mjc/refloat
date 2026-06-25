@@ -86,13 +86,13 @@ static bool buffer_item_eq(BufferItem lhs, BufferItem rhs) {
 #include "c_tests/led_strip/tests.c"
 
 int main(void) {
-    const TestCase tests[] = {        XFAIL_CASE("frequency tracker nonpositive dt", test_frequency_tracker_nonpositive_dt,
+    const TestCase tests[] = {        RED_XFAIL_CASE("frequency tracker nonpositive dt", test_frequency_tracker_nonpositive_dt,
                 "red test: frequency_tracker_update divides by dt directly, so zero or negative "
                 "loop deltas can feed infinity or invalid negative frequencies into the EMA "
                 "instead of being ignored or clamped to a safe positive sample"),
         TEST_CASE("footpad sensor", test_footpad_sensor),
         TEST_CASE("charging timeout boundaries", test_charging_timeout_boundaries),
-        XFAIL_CASE("charging signed payload and invalid frame edges", test_charging_signed_payload_and_invalid_frame_edges,
+        RED_XFAIL_CASE("charging signed payload and invalid frame edges", test_charging_signed_payload_and_invalid_frame_edges,
                 "red test: charging_state_request accepts signed negative charging voltage/current "
                 "from an external module and marks the board charging instead of rejecting or "
                 "sanitizing physically invalid telemetry"),
@@ -100,11 +100,11 @@ int main(void) {
         TEST_CASE("remote uart and command timeout edges", test_remote_uart_and_command_timeout_edges),
         TEST_CASE("remote deadband invert and idle move edges", test_remote_deadband_invert_and_idle_move_edges),
         TEST_CASE("remote deadband and age boundaries", test_remote_deadband_and_age_boundaries),
-        XFAIL_CASE("remote rejects invalid deadband config", test_remote_rejects_invalid_deadband_config,
+        RED_XFAIL_CASE("remote rejects invalid deadband config", test_remote_rejects_invalid_deadband_config,
                 "red test: deserialized config can set inputtilt_deadband to 1.0 or higher, "
                 "and remote_input currently divides by 1 - deadband instead of receiving "
                 "sanitized bounds, so remote input and move speed can become nonfinite"),
-        XFAIL_CASE("remote move torque nonfinite dt", test_remote_move_torque_nonfinite_dt,
+        RED_XFAIL_CASE("remote move torque nonfinite dt", test_remote_move_torque_nonfinite_dt,
                 "red test: remote_get_move_torque integrates the move PID term with dt "
                 "directly, so a nonpositive or nonfinite loop delta can corrupt the "
                 "remote move torque state instead of being skipped as an invalid sample"),
@@ -113,11 +113,11 @@ int main(void) {
         TEST_CASE("bms faults", test_bms_faults),
         TEST_CASE("bms threshold boundaries", test_bms_threshold_boundaries),
         TEST_CASE("bms faults clear on recovery", test_bms_faults_clear_on_recovery),
-        XFAIL_CASE("bms startup grace waits for first sample", test_bms_startup_grace_waits_for_first_sample,
+        RED_XFAIL_CASE("bms startup grace waits for first sample", test_bms_startup_grace_waits_for_first_sample,
                 "red test: bms_init seeds cell voltage/temperature fields with zeroes and "
                 "bms_update suppresses only the connection fault during startup grace, so enabled "
                 "BMS can report cell threshold faults before any real BMS sample arrives"),
-        XFAIL_CASE("bms is fault none is false", test_bms_is_fault_none_is_false,
+        RED_XFAIL_CASE("bms is fault none is false", test_bms_is_fault_none_is_false,
                 "red test: bms_is_fault accepts BMSF_NONE from the public enum but shifts by "
                 "fault_code - 1, so querying the no-fault sentinel can read a bogus bit instead "
                 "of returning false"),

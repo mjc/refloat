@@ -57,25 +57,25 @@ static bool test_charging_signed_payload_and_invalid_frame_edges(void) {
     vesc_if_fake_set_seconds(30.0f);
     uint8_t short_buf[] = {151, 2, 0xff, 0x9c, 0x00};
     charging_state_request(&fixture.charging, short_buf, sizeof(short_buf), &fixture.state);
-    EXPECT_TRUE(!fixture.state.charging);
-    EXPECT_FLOAT_NEAR(fixture.charging.timer, 7.0f);
-    EXPECT_FLOAT_NEAR(fixture.charging.voltage, 1.5f);
-    EXPECT_FLOAT_NEAR(fixture.charging.current, 0.5f);
+    RED_EXPECT_TRUE(!fixture.state.charging);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.timer, 7.0f);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.voltage, 1.5f);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.current, 0.5f);
 
     uint8_t signed_charge_buf[] = {151, 2, 0xff, 0x9c, 0xff, 0xce};
     charging_state_request(&fixture.charging, signed_charge_buf, sizeof(signed_charge_buf), &fixture.state);
-    EXPECT_TRUE(!fixture.state.charging);
-    EXPECT_FLOAT_NEAR(fixture.charging.timer, 7.0f);
-    EXPECT_FLOAT_NEAR(fixture.charging.voltage, 1.5f);
-    EXPECT_FLOAT_NEAR(fixture.charging.current, 0.5f);
+    RED_EXPECT_TRUE(!fixture.state.charging);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.timer, 7.0f);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.voltage, 1.5f);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.current, 0.5f);
 
     vesc_if_fake_set_seconds(31.0f);
     uint8_t bad_magic_buf[] = {0, 0, 0x00, 0x64, 0x00, 0x32};
     charging_state_request(&fixture.charging, bad_magic_buf, sizeof(bad_magic_buf), &fixture.state);
-    EXPECT_TRUE(!fixture.state.charging);
-    EXPECT_FLOAT_NEAR(fixture.charging.timer, 7.0f);
-    EXPECT_FLOAT_NEAR(fixture.charging.voltage, 1.5f);
-    EXPECT_FLOAT_NEAR(fixture.charging.current, 0.5f);
+    RED_EXPECT_TRUE(!fixture.state.charging);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.timer, 7.0f);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.voltage, 1.5f);
+    RED_EXPECT_FLOAT_NEAR(fixture.charging.current, 0.5f);
 
     return true;
 }
