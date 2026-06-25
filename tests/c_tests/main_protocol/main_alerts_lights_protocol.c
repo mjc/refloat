@@ -4,23 +4,9 @@ enum {
     MAIN_COMMAND_ALERTS_CONTROL = 36,
 };
 
-static bool main_protocol_start(lib_info *info, Data **data) {
-    vesc_if_fake_reset();
-
-    EXPECT_TRUE(init(info));
-    EXPECT_TRUE(info->arg != NULL);
-    EXPECT_TRUE(info->stop_fun != NULL);
-    vesc_if_fake_set_arg(info->arg);
-
-    *data = info->arg;
-    return true;
-}
-
 static bool test_main_lights_control_protocol(void) {
-    lib_info info = {0};
-    Data *d = NULL;
-    EXPECT_TRUE(main_protocol_start(&info, &d));
-    (void) d;
+    MainProtocolFixture fixture = {0};
+    EXPECT_TRUE(main_protocol_fixture_start(&fixture));
 
     size_t len = 0;
     const uint8_t *payload = vesc_if_fake_last_app_data(&len);
@@ -52,14 +38,14 @@ static bool test_main_lights_control_protocol(void) {
     EXPECT_EQ_U32(payload[1], MAIN_COMMAND_LIGHTS_CONTROL);
     EXPECT_EQ_U32(payload[2], 0x03u);
 
-    info.stop_fun(info.arg);
+    main_protocol_fixture_stop(&fixture);
     return true;
 }
 
 static bool test_main_alerts_protocol(void) {
-    lib_info info = {0};
-    Data *d = NULL;
-    EXPECT_TRUE(main_protocol_start(&info, &d));
+    MainProtocolFixture fixture = {0};
+    EXPECT_TRUE(main_protocol_fixture_start(&fixture));
+    Data *d = fixture.data;
 
     d->time.now = 1234u;
     alert_tracker_add(&d->alert_tracker, &d->time, ALERT_FW_FAULT, FAULT_CODE_NONE);
@@ -105,15 +91,14 @@ static bool test_main_alerts_protocol(void) {
     vesc_if_fake_invoke_app_data_handler(clear_request, sizeof(clear_request));
     EXPECT_TRUE(!d->alert_tracker.fatal_error);
 
-    info.stop_fun(info.arg);
+    main_protocol_fixture_stop(&fixture);
     return true;
 }
 
 static bool test_main_invalid_command_protocol(void) {
-    lib_info info = {0};
-    Data *d = NULL;
-    EXPECT_TRUE(main_protocol_start(&info, &d));
-    (void) d;
+    MainProtocolFixture fixture = {0};
+    EXPECT_TRUE(main_protocol_fixture_start(&fixture));
+    (void) fixture.data;
 
     uint8_t info_request[] = {101, COMMAND_INFO, 2, 0};
     vesc_if_fake_invoke_app_data_handler(info_request, sizeof(info_request));
@@ -138,6 +123,6 @@ static bool test_main_invalid_command_protocol(void) {
     EXPECT_EQ_U32(payload[0], 101u);
     EXPECT_EQ_U32(payload[1], COMMAND_INFO);
 
-    info.stop_fun(info.arg);
+    main_protocol_fixture_stop(&fixture);
     return true;
 }

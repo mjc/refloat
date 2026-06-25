@@ -41,9 +41,9 @@ static bool main_protocol_invoke_guarded_packet(const uint8_t *prefix, size_t pr
 }
 
 static bool test_main_rejects_short_lock_and_handtest_payloads(void) {
-    lib_info info = {0};
-    Data *d = NULL;
-    EXPECT_TRUE(main_protocol_start(&info, &d));
+    MainProtocolFixture fixture = {0};
+    EXPECT_TRUE(main_protocol_fixture_start(&fixture));
+    Data *d = fixture.data;
 
     uint8_t lock_without_payload[] = {101, MAIN_COMMAND_LOCK};
     bool lock_ok = main_protocol_invoke_guarded_packet(lock_without_payload, sizeof(lock_without_payload), 2u);
@@ -54,7 +54,7 @@ static bool test_main_rejects_short_lock_and_handtest_payloads(void) {
     bool handtest_ok =
         main_protocol_invoke_guarded_packet(handtest_without_payload, sizeof(handtest_without_payload), 2u);
 
-    info.stop_fun(info.arg);
+    main_protocol_fixture_stop(&fixture);
 
     XEXPECT_TRUE(lock_ok);
     XEXPECT_TRUE(handtest_ok);

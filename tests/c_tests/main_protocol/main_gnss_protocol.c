@@ -45,14 +45,10 @@ static bool main_gnss_invoke_without_signal(uint8_t *request, size_t request_len
 }
 
 static bool main_gnss_start(lib_info *info, Data **data) {
-    vesc_if_fake_reset();
-
-    EXPECT_TRUE(init(info));
-    EXPECT_TRUE(info->arg != NULL);
-    EXPECT_TRUE(info->stop_fun != NULL);
-    vesc_if_fake_set_arg(info->arg);
-
-    *data = info->arg;
+    MainProtocolFixture fixture = {0};
+    EXPECT_TRUE(main_protocol_fixture_start(&fixture));
+    *info = fixture.info;
+    *data = fixture.data;
     (*data)->float_conf.hardware.leds.mode = LED_MODE_OFF;
     (*data)->data_record.enabled = false;
     (*data)->time.now = 123456u;
@@ -117,7 +113,7 @@ static bool check_main_info_optional_gnss(bool missing_hook) {
     size_t len = 0;
     const uint8_t *payload = vesc_if_fake_last_app_data(&len);
     EXPECT_TRUE(check_main_info_gnss_flags(payload, len, 0u));
-    info.stop_fun(info.arg);
+    main_protocol_stop_info(&info);
     return true;
 }
 
@@ -141,7 +137,7 @@ static bool check_main_realtime_optional_gnss(bool missing_hook) {
     EXPECT_EQ_U32(len, 15u);
     int32_t index = 0;
     EXPECT_TRUE(check_main_realtime_gnss_prefix(payload, len, 1, data->time.now, &index));
-    info.stop_fun(info.arg);
+    main_protocol_stop_info(&info);
     return true;
 }
 
@@ -209,7 +205,7 @@ static bool test_main_gnss_protocol(void) {
     vesc_if_fake_invoke_app_data_handler(short_request, sizeof(short_request));
     EXPECT_EQ_U32(vesc_if_fake_mc_gnss_calls(), gnss_calls);
 
-    info.stop_fun(info.arg);
+    main_protocol_stop_info(&info);
     return true;
 }
 

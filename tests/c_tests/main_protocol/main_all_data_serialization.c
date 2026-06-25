@@ -3,9 +3,9 @@ enum {
 };
 
 static bool test_main_all_data_saturates_oversized_float16_fields(void) {
-    lib_info info = {0};
-    Data *d = NULL;
-    EXPECT_TRUE(main_protocol_start(&info, &d));
+    MainProtocolFixture fixture = {0};
+    EXPECT_TRUE(main_protocol_fixture_start(&fixture));
+    Data *d = fixture.data;
 
     d->balance_current.value = 4000.0f;
 
@@ -22,6 +22,6 @@ static bool test_main_all_data_saturates_oversized_float16_fields(void) {
     int32_t index = 3;
     EXPECT_EQ_U32(buffer_get_uint16(payload, &index), 0x7fffu);
 
-    info.stop_fun(info.arg);
+    main_protocol_fixture_stop(&fixture);
     return true;
 }
