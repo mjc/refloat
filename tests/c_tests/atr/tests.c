@@ -194,18 +194,18 @@ static bool test_atr_zero_accel_ratio_config(void) {
     md.acceleration.value = 0.0f;
 
     atr_update(&atr, &md, &cfg, false, 0.01f);
-    EXPECT_TRUE(isfinite(atr.accel_diff));
-    EXPECT_TRUE(isfinite(atr.target));
-    EXPECT_TRUE(isfinite(atr.setpoint.value));
+    RED_EXPECT_TRUE(isfinite(atr.accel_diff));
+    RED_EXPECT_TRUE(isfinite(atr.target));
+    RED_EXPECT_TRUE(isfinite(atr.setpoint.value));
 
     md.braking = true;
     md.torque = -20.0f;
     md.erpm_sign = -1;
     md.forward = false;
     atr_update(&atr, &md, &cfg, false, 0.01f);
-    EXPECT_TRUE(isfinite(atr.accel_diff));
-    EXPECT_TRUE(isfinite(atr.target));
-    EXPECT_TRUE(isfinite(atr.setpoint.value));
+    RED_EXPECT_TRUE(isfinite(atr.accel_diff));
+    RED_EXPECT_TRUE(isfinite(atr.target));
+    RED_EXPECT_TRUE(isfinite(atr.setpoint.value));
 
     return true;
 }

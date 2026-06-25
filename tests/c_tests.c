@@ -163,10 +163,11 @@ int main(void) {
         TEST_CASE("booster threshold ramp and reset edges", test_booster_threshold_ramp_and_reset_edges),
         TEST_CASE("atr branch cases", test_atr_branch_cases),
         TEST_CASE("atr threshold speedboost and reset edges", test_atr_threshold_speedboost_and_reset_edges),
-        XFAIL_CASE("atr zero accel ratio config", test_atr_zero_accel_ratio_config,
+        RED_XFAIL_CASE("atr zero accel ratio config", test_atr_zero_accel_ratio_config,
                 "red test: deserialized config can set atr_amps_accel_ratio or "
                 "atr_amps_decel_ratio to zero, and atr_update currently divides by the "
-                "derived factors instead of receiving sanitized positive bounds"),        XFAIL_CASE("balance filter nonfinite dt", test_balance_filter_nonfinite_dt,
+                "derived factors instead of receiving sanitized positive bounds"),
+        RED_XFAIL_CASE("balance filter nonfinite dt", test_balance_filter_nonfinite_dt,
                 "red test: balance_filter_update integrates gyro rates with dt directly and "
                 "normalizes the result, so a nonfinite loop delta can poison quaternion state "
                 "and derived roll/pitch/yaw instead of being ignored as an invalid sample"),
