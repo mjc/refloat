@@ -1,4 +1,5 @@
 name: Build Package
+description: Build the Refloat VESC package with the Nix-provided toolchain.
 
 inputs:
   cache-auth-token:
