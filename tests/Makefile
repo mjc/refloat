@@ -20,20 +20,17 @@ CFLAGS += -std=gnu11 -Wall -Wextra -Werror -Wno-error=array-bounds
 CFLAGS += -Wno-error=pointer-to-int-cast -Wno-error=maybe-uninitialized
 LDLIBS += -lm
 
-# Discover project sources automatically, then let compiler-generated depfiles
-# handle the header graph for each object.
-define find_repo_c_sources
-$(strip $(shell cd $(ROOT_DIR) && find $(1) -type f -name '*.c' -print | LC_ALL=C sort))
-endef
-
 define objects_for
 $(addprefix $(BUILD_DIR)/$(1)/,$(patsubst %.c,%.o,$(2)))
 endef
 
-SRC_DISCOVERED_SOURCES := $(call find_repo_c_sources,src)
+SRC_TOP_LEVEL_SOURCES := $(patsubst $(ROOT_DIR)/%,%,$(wildcard $(ROOT_DIR)/src/*.c))
+SRC_LIB_SOURCES := $(patsubst $(ROOT_DIR)/%,%,$(wildcard $(ROOT_DIR)/src/lib/*.c))
+SRC_FILTER_SOURCES := $(patsubst $(ROOT_DIR)/%,%,$(wildcard $(ROOT_DIR)/src/filters/*.c))
 COMMON_PROJECT_SOURCES := \
-	$(filter-out src/main.c src/leds.c $(GENERATED_PROJECT_SOURCES),$(SRC_DISCOVERED_SOURCES)) \
-	$(GENERATED_PROJECT_SOURCES)
+	$(filter-out src/main.c src/leds.c src/conf/buffer.c $(GENERATED_PROJECT_SOURCES),$(sort $(SRC_TOP_LEVEL_SOURCES) $(SRC_LIB_SOURCES) $(SRC_FILTER_SOURCES))) \
+	$(GENERATED_PROJECT_SOURCES) \
+	src/conf/buffer.c
 LEDS_PROJECT_SOURCES := src/conf/buffer.c src/lib/utils.c src/state.c src/led_strip.c src/leds.c
 
 TEST_SOURCES := \
