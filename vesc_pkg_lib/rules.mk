@@ -27,6 +27,10 @@ SOURCES += $(UTILS_PATH)/rb.c
 SOURCES += $(UTILS_PATH)/utils.c
 
 OBJECTS = $(SOURCES:.c=.so)
+TARGET_ELF = $(TARGET).elf
+TARGET_LIST = $(TARGET).list
+TARGET_BIN = $(TARGET).bin
+TARGET_LISP = $(TARGET).lisp
 
 ifeq ($(USE_OPT),)
 	USE_OPT =
@@ -49,21 +53,29 @@ LDFLAGS = -nostartfiles -static -mfloat-abi=hard -mfpu=fpv4-sp-d16 -mcpu=cortex-
 LDFLAGS += -lm -Wl,--gc-sections,--undefined=init
 LDFLAGS += -T $(VESC_C_LIB_PATH)/link.ld
 
-.PHONY: default all clean
+.PHONY: default all clean $(TARGET)
 
-default: $(TARGET)
+default: $(TARGET_LISP)
 all: default
+
+$(TARGET): $(TARGET_LISP)
 
 %.so: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
+.PRECIOUS: $(TARGET_ELF) $(OBJECTS)
 
-$(TARGET): $(OBJECTS)
-	$(LD) $(OBJECTS) $(LDFLAGS) -o $@.elf
-	$(OBJDUMP) -D $@.elf > $@.list
-	$(OBJCOPY) -O binary $@.elf $@.bin --gap-fill 0x00
-	$(PYTHON) $(VESC_C_LIB_PATH)/conv.py -f $@.bin -n $@ > $@.lisp
+$(TARGET_ELF): $(OBJECTS)
+	$(LD) $(OBJECTS) $(LDFLAGS) -o $@
+
+$(TARGET_LIST): $(TARGET_ELF)
+	$(OBJDUMP) -D $< > $@
+
+$(TARGET_BIN): $(TARGET_ELF)
+	$(OBJCOPY) -O binary $< $@ --gap-fill 0x00
+
+$(TARGET_LISP): $(TARGET_BIN)
+	$(PYTHON) $(VESC_C_LIB_PATH)/conv.py -f $< -n $(TARGET) > $@
 
 clean:
-	rm -f $(OBJECTS) $(TARGET).elf $(TARGET).list $(TARGET).lisp $(TARGET).bin $(ADD_TO_CLEAN)
+	rm -f $(OBJECTS) $(TARGET_ELF) $(TARGET_LIST) $(TARGET_LISP) $(TARGET_BIN) $(ADD_TO_CLEAN)

@@ -62,6 +62,7 @@ TEST_OBJECTS := $(call objects_for,c,$(TEST_SOURCES))
 MAIN_OBJECTS := $(call objects_for,main,$(MAIN_SOURCES))
 LEDS_OBJECTS := $(call objects_for,leds,$(LEDS_SOURCES))
 DEPFILES := $(TEST_OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d) $(LEDS_OBJECTS:.o=.d)
+TRACKED_BUILD_ARTIFACTS := $(sort $(TEST_OBJECTS) $(MAIN_OBJECTS) $(LEDS_OBJECTS) $(DEPFILES))
 
 VPATH := $(CURDIR) $(ROOT_DIR)
 
@@ -69,10 +70,21 @@ all: $(TEST_BIN) $(LEDS_TEST_BIN) $(MAIN_TEST_BIN)
 
 generated_conf: $(GENERATED_CONF)
 
+sync-build-artifacts:
+	@mkdir -p $(BUILD_DIR)
+	@find $(BUILD_DIR) -type f \( -name '*.o' -o -name '*.d' \) -print | \
+	while IFS= read -r path; do \
+		case " $(TRACKED_BUILD_ARTIFACTS) " in \
+			*" $$path "*) ;; \
+			*) rm -f "$$path" ;; \
+		esac; \
+	done
+
 $(GENERATED_CONF) &: $(ROOT_DIR)/src/conf/settings.xml $(ROOT_DIR)/src/conf/conf_general.h.in $(ROOT_DIR)/package_name $(ROOT_DIR)/version $(GIT_DEPS)
 	$(MAKE) -C $(ROOT_DIR)/src conf/conf_general.h conf/confparser.c conf/confxml.c
 
-$(TEST_OBJECTS) $(MAIN_OBJECTS): | generated_conf
+$(TEST_OBJECTS) $(MAIN_OBJECTS): | generated_conf sync-build-artifacts
+$(LEDS_OBJECTS): | sync-build-artifacts
 
 $(BUILD_DIR)/c/%.o: %.c
 	@mkdir -p $(@D)
@@ -115,7 +127,7 @@ clean:
 
 -include $(DEPFILES)
 
-.PHONY: all check check-qml-behavior check-smoke clean
+.PHONY: all check check-qml-behavior check-smoke clean sync-build-artifacts
 .PHONY: generated_conf check-main
 
 check-main: $(MAIN_TEST_BIN)
