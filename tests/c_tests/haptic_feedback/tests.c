@@ -15,338 +15,277 @@ static RefloatConfig haptic_test_config(void) {
     return cfg;
 }
 
-static bool test_haptic_feedback_patterns(void) {
+typedef struct {
+    HapticFeedback hf;
+    MotorControl mc;
+    RefloatConfig cfg;
+    State state;
+    MotorData md;
+    AlertTracker at;
+    Time time;
+} HapticFixture;
+
+static HapticFixture haptic_fixture_start(void) {
     feedback_fakes_reset();
     vesc_if_fake_reset();
 
-    HapticFeedback hf;
-    haptic_feedback_init(&hf);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_NONE);
-    EXPECT_TRUE(hf.can_change_type);
+    HapticFixture fixture = {0};
+    fixture.cfg = haptic_test_config();
+    haptic_feedback_init(&fixture.hf);
+    motor_control_init(&fixture.mc);
+    motor_control_configure(&fixture.mc, &fixture.cfg, 1000u);
+    haptic_feedback_configure(&fixture.hf, &fixture.cfg);
+    fixture.state = (State) {.state = STATE_RUNNING, .mode = MODE_NORMAL, .sat = SAT_PB_DUTY};
+    fixture.md.speed = 5.0f;
+    fixture.time.now = 1000u;
+    return fixture;
+}
 
-    RefloatConfig cfg = {0};
-    cfg.tiltback_duty = 0.5f;
-    cfg.haptic.duty.frequency = 440;
-    cfg.haptic.duty.strength = 0.7f;
-    cfg.haptic.error.frequency = 880;
-    cfg.haptic.error.strength = 0.9f;
-    cfg.haptic.vibrate.frequency = 1200;
-    cfg.haptic.vibrate.strength = 0.25f;
-    cfg.haptic.min_strength = 0.4f;
-    cfg.haptic.strength_curvature = 0.0f;
-    cfg.haptic.max_strength_speed = 10.0f;
-    cfg.haptic.duty_solid_offset = 0.1f;
-    cfg.haptic.current_threshold = 0.0f;
-    haptic_feedback_configure(&hf, &cfg);
-    EXPECT_FLOAT_NEAR(hf.duty_solid_threshold, 0.6f);
-    EXPECT_TRUE(hf.str_poly_b > 0.0f);
+static bool test_haptic_feedback_patterns(void) {
+    HapticFixture fixture = haptic_fixture_start();
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_NONE);
+    EXPECT_TRUE(fixture.hf.can_change_type);
+    EXPECT_FLOAT_NEAR(fixture.hf.duty_solid_threshold, 0.6f);
+    EXPECT_TRUE(fixture.hf.str_poly_b > 0.0f);
 
-    State state = {.state = STATE_RUNNING, .mode = MODE_NORMAL, .sat = SAT_PB_DUTY};
-    MotorData md = {0};
-    md.speed = 5.0f;
-    md.duty_cycle.value = 0.7f;
-    MotorControl mc;
-    motor_control_init(&mc);
-    motor_control_configure(&mc, &cfg, 1000u);
-    AlertTracker at = {0};
-    Time time = {.now = 1000u};
-
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
-    EXPECT_TRUE(hf.is_playing);
+    fixture.md.duty_cycle.value = 0.7f;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
+    EXPECT_TRUE(fixture.hf.is_playing);
     EXPECT_TRUE(vesc_if_fake_foc_play_tone_calls() == 1);
     EXPECT_TRUE(vesc_if_fake_last_foc_channel() == 0);
     EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), 440.0f);
-    EXPECT_TRUE(vesc_if_fake_last_foc_voltage() > cfg.haptic.min_strength * cfg.haptic.duty.strength);
-    EXPECT_TRUE(mc.tone_ticks > 0);
-    EXPECT_FLOAT_NEAR(mc.tone_intensity, cfg.haptic.vibrate.strength * 0.7f);
+    EXPECT_TRUE(vesc_if_fake_last_foc_voltage() > fixture.cfg.haptic.min_strength * fixture.cfg.haptic.duty.strength);
+    EXPECT_TRUE(fixture.mc.tone_ticks > 0);
+    EXPECT_FLOAT_NEAR(fixture.mc.tone_intensity, fixture.cfg.haptic.vibrate.strength * 0.7f);
 
-    state.sat = SAT_NONE;
-    at.fatal_error = true;
-    time.now += 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_FATAL);
+    fixture.state.sat = SAT_NONE;
+    fixture.at.fatal_error = true;
+    fixture.time.now += 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_FATAL);
     EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), 880.0f);
 
-    at.fatal_error = false;
-    state.sat = SAT_PB_TEMPERATURE;
-    hf.can_change_type = true;
-    time.now += 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_TEMPERATURE);
+    fixture.at.fatal_error = false;
+    fixture.state.sat = SAT_PB_TEMPERATURE;
+    fixture.hf.can_change_type = true;
+    fixture.time.now += 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_TEMPERATURE);
 
-    state.sat = SAT_PB_LOW_VOLTAGE;
-    hf.can_change_type = true;
-    time.now += 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
+    fixture.state.sat = SAT_PB_LOW_VOLTAGE;
+    fixture.hf.can_change_type = true;
+    fixture.time.now += 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
 
-    state.sat = SAT_NONE;
-    cfg.haptic.current_threshold = 0.5f;
-    haptic_feedback_configure(&hf, &cfg);
-    hf.can_change_type = true;
-    md.motor_current_saturation = 0.75f;
-    time.now += 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
+    fixture.state.sat = SAT_NONE;
+    fixture.cfg.haptic.current_threshold = 0.5f;
+    haptic_feedback_configure(&fixture.hf, &fixture.cfg);
+    fixture.hf.can_change_type = true;
+    fixture.md.motor_current_saturation = 0.75f;
+    fixture.time.now += 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
 
-    state.sat = SAT_PB_DUTY;
-    md.duty_cycle.value = 0.55f;
-    hf.can_change_type = true;
-    time.now += 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_DUTY_SPEED);
+    fixture.state.sat = SAT_PB_DUTY;
+    fixture.md.duty_cycle.value = 0.55f;
+    fixture.hf.can_change_type = true;
+    fixture.time.now += 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_DUTY_SPEED);
 
-    time.now = hf.tone_timer + 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(!hf.is_playing);
-    EXPECT_TRUE(mc.tone_ticks == 0);
+    fixture.time.now = fixture.hf.tone_timer + 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(!fixture.hf.is_playing);
+    EXPECT_TRUE(fixture.mc.tone_ticks == 0);
     EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_voltage(), 0.0f);
 
-    state.mode = MODE_HANDTEST;
-    time.now += 150000u;
-    hf.can_change_type = true;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_NONE);
+    fixture.state.mode = MODE_HANDTEST;
+    fixture.time.now += 150000u;
+    fixture.hf.can_change_type = true;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_NONE);
 
     return true;
 }
 
 static bool test_haptic_feedback_gating_and_strength_edges(void) {
-    feedback_fakes_reset();
-    vesc_if_fake_reset();
-
-    HapticFeedback hf;
-    haptic_feedback_init(&hf);
-    RefloatConfig cfg = haptic_test_config();
-    haptic_feedback_configure(&hf, &cfg);
-
-    MotorControl mc;
-    motor_control_init(&mc);
-    motor_control_configure(&mc, &cfg, 1000u);
-    State state = {.state = STATE_READY, .mode = MODE_NORMAL, .sat = SAT_PB_DUTY};
-    MotorData md = {0};
-    md.speed = 5.0f;
-    md.duty_cycle.value = 0.8f;
-    AlertTracker at = {.fatal_error = true};
-    Time time = {.now = 1000u};
-
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_NONE);
-    EXPECT_TRUE(!hf.is_playing);
+    HapticFixture fixture = haptic_fixture_start();
+    fixture.state.state = STATE_READY;
+    fixture.at.fatal_error = true;
+    fixture.md.duty_cycle.value = 0.8f;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_NONE);
+    EXPECT_TRUE(!fixture.hf.is_playing);
     EXPECT_TRUE(vesc_if_fake_foc_play_tone_calls() == 0);
-    EXPECT_TRUE(mc.tone_ticks == 0);
+    EXPECT_TRUE(fixture.mc.tone_ticks == 0);
 
-    state.state = STATE_RUNNING;
-    state.mode = MODE_HANDTEST;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_NONE);
+    fixture.state.mode = MODE_HANDTEST;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_NONE);
     EXPECT_TRUE(vesc_if_fake_foc_play_tone_calls() == 0);
 
-    state.mode = MODE_NORMAL;
-    at.fatal_error = false;
-    cfg.haptic.duty.strength = 0.0f;
-    cfg.haptic.vibrate.strength = 0.0f;
-    haptic_feedback_configure(&hf, &cfg);
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
-    EXPECT_TRUE(hf.is_playing);
+    fixture.state.mode = MODE_NORMAL;
+    fixture.state.state = STATE_RUNNING;
+    fixture.at.fatal_error = false;
+    fixture.cfg.haptic.duty.strength = 0.0f;
+    fixture.cfg.haptic.vibrate.strength = 0.0f;
+    haptic_feedback_configure(&fixture.hf, &fixture.cfg);
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
+    EXPECT_TRUE(fixture.hf.is_playing);
     EXPECT_TRUE(vesc_if_fake_foc_play_tone_calls() == 0);
-    EXPECT_TRUE(mc.tone_ticks == 0);
+    EXPECT_TRUE(fixture.mc.tone_ticks == 0);
 
-    haptic_feedback_init(&hf);
-    cfg = haptic_test_config();
-    cfg.haptic.max_strength_speed = 0.0f;
-    haptic_feedback_configure(&hf, &cfg);
-    motor_control_configure(&mc, &cfg, 1000u);
-    md.speed = 0.5f;
-    time.now += 1000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_voltage(), cfg.haptic.duty.strength * 0.7f);
-    EXPECT_FLOAT_NEAR(mc.tone_intensity, cfg.haptic.vibrate.strength * 0.7f);
+    haptic_feedback_init(&fixture.hf);
+    fixture.cfg = haptic_test_config();
+    fixture.cfg.haptic.max_strength_speed = 0.0f;
+    haptic_feedback_configure(&fixture.hf, &fixture.cfg);
+    motor_control_configure(&fixture.mc, &fixture.cfg, 1000u);
+    fixture.md.speed = 0.5f;
+    fixture.time.now += 1000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_voltage(), fixture.cfg.haptic.duty.strength * 0.7f);
+    EXPECT_FLOAT_NEAR(fixture.mc.tone_intensity, fixture.cfg.haptic.vibrate.strength * 0.7f);
 
     return true;
 }
 
 static bool test_haptic_feedback_shared_strength_scale(void) {
-    feedback_fakes_reset();
-    vesc_if_fake_reset();
+    HapticFixture fixture = haptic_fixture_start();
+    fixture.cfg.haptic.min_strength = 0.25f;
+    fixture.cfg.haptic.strength_curvature = 0.0f;
+    fixture.cfg.haptic.max_strength_speed = 20.0f;
+    fixture.cfg.haptic.duty.strength = 0.8f;
+    fixture.cfg.haptic.vibrate.strength = 0.3f;
+    haptic_feedback_configure(&fixture.hf, &fixture.cfg);
+    motor_control_configure(&fixture.mc, &fixture.cfg, 1000u);
+    fixture.state = (State) {.state = STATE_RUNNING, .mode = MODE_NORMAL, .sat = SAT_PB_DUTY};
+    fixture.md.speed = -10.0f;
+    fixture.md.duty_cycle.value = 0.8f;
 
-    HapticFeedback hf;
-    haptic_feedback_init(&hf);
-    RefloatConfig cfg = haptic_test_config();
-    cfg.haptic.min_strength = 0.25f;
-    cfg.haptic.strength_curvature = 0.0f;
-    cfg.haptic.max_strength_speed = 20.0f;
-    cfg.haptic.duty.strength = 0.8f;
-    cfg.haptic.vibrate.strength = 0.3f;
-    haptic_feedback_configure(&hf, &cfg);
-
-    MotorControl mc;
-    motor_control_init(&mc);
-    motor_control_configure(&mc, &cfg, 1000u);
-
-    State state = {.state = STATE_RUNNING, .mode = MODE_NORMAL, .sat = SAT_PB_DUTY};
-    MotorData md = {.speed = -10.0f};
-    md.duty_cycle.value = 0.8f;
-    AlertTracker at = {0};
-    Time time = {.now = 1000u};
-
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
 
     float expected_scale = 0.625f;
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
-    EXPECT_TRUE(hf.is_playing);
-    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_voltage(), cfg.haptic.duty.strength * expected_scale);
-    EXPECT_FLOAT_NEAR(mc.tone_intensity, cfg.haptic.vibrate.strength * expected_scale);
-    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), cfg.haptic.duty.frequency);
-    EXPECT_EQ_U32(mc.tone_ticks, 1u);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
+    EXPECT_TRUE(fixture.hf.is_playing);
+    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_voltage(), fixture.cfg.haptic.duty.strength * expected_scale);
+    EXPECT_FLOAT_NEAR(fixture.mc.tone_intensity, fixture.cfg.haptic.vibrate.strength * expected_scale);
+    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), fixture.cfg.haptic.duty.frequency);
+    EXPECT_EQ_U32(fixture.mc.tone_ticks, 1u);
 
     return true;
 }
 
 static bool test_haptic_feedback_pattern_type_change_lockout(void) {
-    feedback_fakes_reset();
-    vesc_if_fake_reset();
+    HapticFixture fixture = haptic_fixture_start();
+    fixture.state.sat = SAT_PB_LOW_VOLTAGE;
+    fixture.time.now = 2000u;
 
-    HapticFeedback hf;
-    haptic_feedback_init(&hf);
-    RefloatConfig cfg = haptic_test_config();
-    haptic_feedback_configure(&hf, &cfg);
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
+    EXPECT_TRUE(fixture.hf.is_playing);
+    EXPECT_TRUE(fixture.hf.can_change_type);
 
-    MotorControl mc;
-    motor_control_init(&mc);
-    motor_control_configure(&mc, &cfg, 1000u);
-    State state = {.state = STATE_RUNNING, .mode = MODE_NORMAL, .sat = SAT_PB_LOW_VOLTAGE};
-    MotorData md = {.speed = 2.0f};
-    AlertTracker at = {0};
-    Time time = {.now = 2000u};
+    fixture.time.now = fixture.hf.tone_timer + 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
+    EXPECT_TRUE(!fixture.hf.is_playing);
+    EXPECT_TRUE(!fixture.hf.can_change_type);
 
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
-    EXPECT_TRUE(hf.is_playing);
-    EXPECT_TRUE(hf.can_change_type);
+    fixture.at.fatal_error = true;
+    fixture.state.sat = SAT_NONE;
+    fixture.time.now += 10000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
+    EXPECT_TRUE(!fixture.hf.can_change_type);
 
-    time.now = hf.tone_timer + 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
-    EXPECT_TRUE(!hf.is_playing);
-    EXPECT_TRUE(!hf.can_change_type);
+    fixture.time.now = fixture.hf.tone_timer + 801000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.can_change_type);
 
-    at.fatal_error = true;
-    state.sat = SAT_NONE;
-    time.now += 10000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
-    EXPECT_TRUE(!hf.can_change_type);
-
-    time.now = hf.tone_timer + 801000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.can_change_type);
-
-    time.now += 1000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_FATAL);
+    fixture.time.now += 1000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_FATAL);
 
     return true;
 }
 
 static bool test_haptic_feedback_type_selection_edges(void) {
-    feedback_fakes_reset();
-    vesc_if_fake_reset();
+    HapticFixture fixture = haptic_fixture_start();
+    fixture.state.sat = SAT_PB_SPEED;
+    fixture.md.speed = -3.0f;
+    fixture.time.now = 3000u;
 
-    HapticFeedback hf;
-    haptic_feedback_init(&hf);
-    RefloatConfig cfg = haptic_test_config();
-    haptic_feedback_configure(&hf, &cfg);
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_DUTY_SPEED);
+    EXPECT_TRUE(fixture.hf.is_playing);
+    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), fixture.cfg.haptic.duty.frequency);
 
-    MotorControl mc;
-    motor_control_init(&mc);
-    motor_control_configure(&mc, &cfg, 1000u);
-    State state = {.state = STATE_RUNNING, .mode = MODE_NORMAL, .sat = SAT_PB_SPEED};
-    MotorData md = {.speed = -3.0f};
-    AlertTracker at = {0};
-    Time time = {.now = 3000u};
+    fixture.state.sat = SAT_PB_HIGH_VOLTAGE;
+    fixture.hf.can_change_type = true;
+    fixture.time.now += 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
+    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), fixture.cfg.haptic.error.frequency);
 
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_DUTY_SPEED);
-    EXPECT_TRUE(hf.is_playing);
-    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), cfg.haptic.duty.frequency);
+    fixture.state.sat = SAT_PB_ERROR;
+    fixture.hf.can_change_type = true;
+    fixture.time.now += 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
 
-    state.sat = SAT_PB_HIGH_VOLTAGE;
-    hf.can_change_type = true;
-    time.now += 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
-    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), cfg.haptic.error.frequency);
-
-    state.sat = SAT_PB_ERROR;
-    hf.can_change_type = true;
-    time.now += 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_VOLTAGE);
-
-    haptic_feedback_init(&hf);
-    haptic_feedback_configure(&hf, &cfg);
-    state.sat = SAT_PB_DUTY;
-    md.duty_cycle.value = 0.8f;
+    haptic_feedback_init(&fixture.hf);
+    haptic_feedback_configure(&fixture.hf, &fixture.cfg);
+    fixture.state.sat = SAT_PB_DUTY;
+    fixture.md.duty_cycle.value = 0.8f;
     fake_vesc_if.foc_play_tone = NULL;
-    time.now += 100000u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
-    EXPECT_TRUE(hf.is_playing);
+    fixture.time.now += 100000u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_DUTY_CONTINUOUS);
+    EXPECT_TRUE(fixture.hf.is_playing);
     EXPECT_TRUE(vesc_if_fake_foc_play_tone_calls() == 3);
-    EXPECT_TRUE(mc.tone_ticks > 0);
+    EXPECT_TRUE(fixture.mc.tone_ticks > 0);
 
     return true;
 }
 
 static bool test_haptic_feedback_error_pattern_pause_edges(void) {
-    feedback_fakes_reset();
-    vesc_if_fake_reset();
+    HapticFixture fixture = haptic_fixture_start();
+    fixture.state.sat = SAT_PB_TEMPERATURE;
+    fixture.md.speed = 0.0f;
+    fixture.time.now = 4000u;
 
-    HapticFeedback hf;
-    haptic_feedback_init(&hf);
-    RefloatConfig cfg = haptic_test_config();
-    haptic_feedback_configure(&hf, &cfg);
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.type_playing == HAPTIC_FEEDBACK_ERROR_TEMPERATURE);
+    EXPECT_TRUE(fixture.hf.is_playing);
+    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), fixture.cfg.haptic.error.frequency);
 
-    MotorControl mc;
-    motor_control_init(&mc);
-    motor_control_configure(&mc, &cfg, 1000u);
-    State state = {.state = STATE_RUNNING, .mode = MODE_NORMAL, .sat = SAT_PB_TEMPERATURE};
-    MotorData md = {.speed = 0.0f};
-    AlertTracker at = {0};
-    Time time = {.now = 4000u};
-
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.type_playing == HAPTIC_FEEDBACK_ERROR_TEMPERATURE);
-    EXPECT_TRUE(hf.is_playing);
-    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), cfg.haptic.error.frequency);
-
-    time.now = hf.tone_timer + 1100u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(!hf.is_playing);
+    fixture.time.now = fixture.hf.tone_timer + 1100u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(!fixture.hf.is_playing);
     EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_voltage(), 0.0f);
 
-    time.now = hf.tone_timer + 2100u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.is_playing);
-    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), cfg.haptic.error.frequency);
+    fixture.time.now = fixture.hf.tone_timer + 2100u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.is_playing);
+    EXPECT_FLOAT_NEAR(vesc_if_fake_last_foc_frequency(), fixture.cfg.haptic.error.frequency);
 
-    time.now = hf.tone_timer + 3100u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(!hf.is_playing);
+    fixture.time.now = fixture.hf.tone_timer + 3100u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(!fixture.hf.is_playing);
     size_t calls_before_skipped_beat = vesc_if_fake_foc_play_tone_calls();
 
-    time.now = hf.tone_timer + 4100u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(!hf.is_playing);
+    fixture.time.now = fixture.hf.tone_timer + 4100u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(!fixture.hf.is_playing);
     EXPECT_TRUE(vesc_if_fake_foc_play_tone_calls() == calls_before_skipped_beat);
 
-    time.now = hf.tone_timer + 6100u;
-    haptic_feedback_update(&hf, &mc, &state, &md, &at, &time);
-    EXPECT_TRUE(hf.is_playing);
-    EXPECT_TRUE(hf.can_change_type);
+    fixture.time.now = fixture.hf.tone_timer + 6100u;
+    haptic_feedback_update(&fixture.hf, &fixture.mc, &fixture.state, &fixture.md, &fixture.at, &fixture.time);
+    EXPECT_TRUE(fixture.hf.is_playing);
+    EXPECT_TRUE(fixture.hf.can_change_type);
 
     return true;
 }
