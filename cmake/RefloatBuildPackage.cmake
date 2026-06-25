@@ -10,9 +10,12 @@ if(NOT DEFINED REFLOAT_PACKAGE_BUILD_LOG)
   message(FATAL_ERROR "REFLOAT_PACKAGE_BUILD_LOG is required")
 endif()
 
+if(NOT DEFINED REFLOAT_PACKAGE_DESC)
+  message(FATAL_ERROR "REFLOAT_PACKAGE_DESC is required")
+endif()
+
 execute_process(
-  COMMAND "${REFLOAT_VESC_TOOL_EXECUTABLE}" --buildPkgFromDesc pkgdesc.qml
-  WORKING_DIRECTORY "${REFLOAT_ROOT}"
+  COMMAND "${REFLOAT_VESC_TOOL_EXECUTABLE}" --buildPkgFromDesc "${REFLOAT_PACKAGE_DESC}"
   RESULT_VARIABLE _refloat_package_result
   OUTPUT_VARIABLE _refloat_package_stdout
   ERROR_VARIABLE _refloat_package_stderr

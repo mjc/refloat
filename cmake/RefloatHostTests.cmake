@@ -5,7 +5,7 @@ find_package(Git REQUIRED)
 find_program(REFLOAT_VESC_TOOL_EXECUTABLE NAMES vesc_tool REQUIRED)
 include(Catch)
 
-set(REFLOAT_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
+file(REAL_PATH "${CMAKE_CURRENT_LIST_DIR}/.." REFLOAT_ROOT)
 set(REFLOAT_SRC_DIR "${REFLOAT_ROOT}/src")
 set(REFLOAT_TEST_DIR "${REFLOAT_ROOT}/tests")
 set(REFLOAT_GENERATED_CONF_ROOT "${CMAKE_CURRENT_BINARY_DIR}/generated")
@@ -147,28 +147,10 @@ add_custom_command(
     "${CMAKE_COMMAND}"
     -DREFLOAT_ROOT=${REFLOAT_ROOT}
     -DREFLOAT_SRC_DIR=${REFLOAT_SRC_DIR}
+    -DREFLOAT_CONF_OUTPUT_DIR=${REFLOAT_GENERATED_CONF_DIR}
     -DVESC_TOOL_EXECUTABLE=${REFLOAT_VESC_TOOL_EXECUTABLE}
     -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
     -P "${CMAKE_CURRENT_LIST_DIR}/RefloatGeneratePackageConf.cmake"
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "${REFLOAT_GENERATED_CONF_DIR}"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${REFLOAT_SRC_DIR}/conf/conf_default.h"
-    "${REFLOAT_GENERATED_CONF_DIR}/conf_default.h"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${REFLOAT_SRC_DIR}/conf/confparser.h"
-    "${REFLOAT_GENERATED_CONF_DIR}/confparser.h"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${REFLOAT_SRC_DIR}/conf/confxml.h"
-    "${REFLOAT_GENERATED_CONF_DIR}/confxml.h"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${REFLOAT_SRC_DIR}/conf/conf_general.h"
-    "${REFLOAT_GENERATED_CONF_DIR}/conf_general.h"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${REFLOAT_SRC_DIR}/conf/confparser.c"
-    "${REFLOAT_GENERATED_CONF_DIR}/confparser.c"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${REFLOAT_SRC_DIR}/conf/confxml.c"
-    "${REFLOAT_GENERATED_CONF_DIR}/confxml.c"
   WORKING_DIRECTORY "${REFLOAT_ROOT}"
   DEPENDS ${REFLOAT_GENERATED_CONF_INPUTS}
   COMMENT "Generating Refloat config parser sources"
@@ -449,24 +431,31 @@ if(REFLOAT_BUILD_PACKAGE)
   get_filename_component(REFLOAT_QT_ROOT_DIR "${REFLOAT_QT_BIN_DIR}" DIRECTORY)
   set(REFLOAT_QT_QML_IMPORT_DIR "${REFLOAT_QT_ROOT_DIR}/lib/qt-6/qml")
 
+  set(REFLOAT_PACKAGE_ARTIFACT_DIR "${CMAKE_CURRENT_BINARY_DIR}/artifacts")
+  set(REFLOAT_PACKAGE_GENERATED_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated-package-src")
+  set(REFLOAT_PACKAGE_CONF_DIR "${REFLOAT_PACKAGE_GENERATED_SRC_DIR}/conf")
   set(REFLOAT_PACKAGE_README_INPUT "${REFLOAT_ROOT}/package_README.md")
-  set(REFLOAT_PACKAGE_README_OUTPUT "${REFLOAT_ROOT}/package_README-gen.md")
+  set(REFLOAT_PACKAGE_README_OUTPUT "${REFLOAT_PACKAGE_ARTIFACT_DIR}/package_README-gen.md")
   set(REFLOAT_PACKAGE_QML_INPUT "${REFLOAT_ROOT}/ui.qml.in")
-  set(REFLOAT_PACKAGE_QML_OUTPUT "${REFLOAT_ROOT}/ui.qml")
-  set(REFLOAT_PACKAGE_ARTIFACT "${REFLOAT_ROOT}/refloat.vescpkg")
+  set(REFLOAT_PACKAGE_QML_OUTPUT "${REFLOAT_PACKAGE_ARTIFACT_DIR}/ui.qml")
+  set(REFLOAT_PACKAGE_LISP_INPUT "${REFLOAT_ROOT}/lisp/package.lisp")
+  set(REFLOAT_PACKAGE_LISP_OUTPUT "${REFLOAT_PACKAGE_ARTIFACT_DIR}/package.lisp")
+  set(REFLOAT_PACKAGE_DESC_INPUT "${REFLOAT_ROOT}/pkgdesc.qml")
+  set(REFLOAT_PACKAGE_DESC_OUTPUT "${REFLOAT_PACKAGE_ARTIFACT_DIR}/pkgdesc.qml")
+  set(REFLOAT_PACKAGE_ARTIFACT "${REFLOAT_PACKAGE_ARTIFACT_DIR}/refloat.vescpkg")
   set(REFLOAT_PACKAGE_BUILD_LOG "${CMAKE_CURRENT_BINARY_DIR}/refloat-package.log")
   set(REFLOAT_PACKAGE_CONF_OUTPUTS
-    "${REFLOAT_SRC_DIR}/conf/conf_default.h"
-    "${REFLOAT_SRC_DIR}/conf/confparser.h"
-    "${REFLOAT_SRC_DIR}/conf/confxml.h"
-    "${REFLOAT_SRC_DIR}/conf/conf_general.h"
-    "${REFLOAT_SRC_DIR}/conf/confparser.c"
-    "${REFLOAT_SRC_DIR}/conf/confxml.c"
+    "${REFLOAT_PACKAGE_CONF_DIR}/conf_default.h"
+    "${REFLOAT_PACKAGE_CONF_DIR}/confparser.h"
+    "${REFLOAT_PACKAGE_CONF_DIR}/confxml.h"
+    "${REFLOAT_PACKAGE_CONF_DIR}/conf_general.h"
+    "${REFLOAT_PACKAGE_CONF_DIR}/confparser.c"
+    "${REFLOAT_PACKAGE_CONF_DIR}/confxml.c"
   )
-  set(REFLOAT_PACKAGE_LIB_BINARY "${REFLOAT_SRC_DIR}/package_lib.bin")
-  set(REFLOAT_PACKAGE_LIB_ELF "${REFLOAT_SRC_DIR}/package_lib.elf")
-  set(REFLOAT_PACKAGE_LIB_LIST "${REFLOAT_SRC_DIR}/package_lib.list")
-  set(REFLOAT_PACKAGE_LIB_LISP "${REFLOAT_SRC_DIR}/package_lib.lisp")
+  set(REFLOAT_PACKAGE_LIB_BINARY "${REFLOAT_PACKAGE_ARTIFACT_DIR}/package_lib.bin")
+  set(REFLOAT_PACKAGE_LIB_ELF "${REFLOAT_PACKAGE_ARTIFACT_DIR}/package_lib.elf")
+  set(REFLOAT_PACKAGE_LIB_LIST "${REFLOAT_PACKAGE_ARTIFACT_DIR}/package_lib.list")
+  set(REFLOAT_PACKAGE_LIB_LISP "${REFLOAT_PACKAGE_ARTIFACT_DIR}/package_lib.lisp")
   set(REFLOAT_PACKAGE_LIB_OBJ_DIR "${CMAKE_CURRENT_BINARY_DIR}/package-lib-objects")
   file(GLOB REFLOAT_PACKAGE_LIB_SOURCES CONFIGURE_DEPENDS
     "${REFLOAT_SRC_DIR}/*.c"
@@ -475,14 +464,15 @@ if(REFLOAT_BUILD_PACKAGE)
   )
   list(APPEND REFLOAT_PACKAGE_LIB_SOURCES
     "${REFLOAT_SRC_DIR}/conf/buffer.c"
-    "${REFLOAT_SRC_DIR}/conf/confparser.c"
-    "${REFLOAT_SRC_DIR}/conf/confxml.c"
+    "${REFLOAT_PACKAGE_CONF_DIR}/confparser.c"
+    "${REFLOAT_PACKAGE_CONF_DIR}/confxml.c"
     "${REFLOAT_ROOT}/vesc_pkg_lib/utils/rb.c"
     "${REFLOAT_ROOT}/vesc_pkg_lib/utils/utils.c"
   )
 
   add_custom_command(
     OUTPUT "${REFLOAT_PACKAGE_README_OUTPUT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${REFLOAT_PACKAGE_ARTIFACT_DIR}"
     COMMAND
       "${CMAKE_COMMAND}"
       -DREFLOAT_PACKAGE_README_INPUT=${REFLOAT_PACKAGE_README_INPUT}
@@ -495,13 +485,14 @@ if(REFLOAT_BUILD_PACKAGE)
       "${REFLOAT_PACKAGE_README_INPUT}"
       "${REFLOAT_ROOT}/version"
       ${REFLOAT_GIT_DEPS}
-    COMMENT "Generating package_README-gen.md"
+    COMMENT "Generating package README"
     VERBATIM
   )
   add_custom_target(refloat-package-readme DEPENDS "${REFLOAT_PACKAGE_README_OUTPUT}")
 
   add_custom_command(
     OUTPUT "${REFLOAT_PACKAGE_QML_OUTPUT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${REFLOAT_PACKAGE_ARTIFACT_DIR}"
     COMMAND
       "${CMAKE_COMMAND}"
       -DREFLOAT_PACKAGE_QML_INPUT=${REFLOAT_PACKAGE_QML_INPUT}
@@ -517,7 +508,7 @@ if(REFLOAT_BUILD_PACKAGE)
       "${REFLOAT_ROOT}/package_name"
       "${REFLOAT_ROOT}/version"
       "${REFLOAT_ROOT}/rjsmin.py"
-    COMMENT "Generating ui.qml"
+    COMMENT "Generating package QML"
     VERBATIM
   )
   add_custom_target(refloat-package-qml DEPENDS "${REFLOAT_PACKAGE_QML_OUTPUT}")
@@ -528,6 +519,7 @@ if(REFLOAT_BUILD_PACKAGE)
       "${CMAKE_COMMAND}"
       -DREFLOAT_ROOT=${REFLOAT_ROOT}
       -DREFLOAT_SRC_DIR=${REFLOAT_SRC_DIR}
+      -DREFLOAT_CONF_OUTPUT_DIR=${REFLOAT_PACKAGE_CONF_DIR}
       -DVESC_TOOL_EXECUTABLE=${REFLOAT_VESC_TOOL_EXECUTABLE}
       -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
       -P "${CMAKE_CURRENT_LIST_DIR}/RefloatGeneratePackageConf.cmake"
@@ -542,8 +534,50 @@ if(REFLOAT_BUILD_PACKAGE)
   )
   add_custom_target(refloat-package-conf DEPENDS ${REFLOAT_PACKAGE_CONF_OUTPUTS})
 
+  add_custom_command(
+    OUTPUT "${REFLOAT_PACKAGE_LISP_OUTPUT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${REFLOAT_PACKAGE_ARTIFACT_DIR}"
+    COMMAND
+      "${CMAKE_COMMAND}"
+      -DREFLOAT_PACKAGE_LISP_INPUT=${REFLOAT_PACKAGE_LISP_INPUT}
+      -DREFLOAT_PACKAGE_LISP_OUTPUT=${REFLOAT_PACKAGE_LISP_OUTPUT}
+      -DREFLOAT_PACKAGE_LIB_BINARY=${REFLOAT_PACKAGE_LIB_BINARY}
+      -DREFLOAT_BMS_LISP_INPUT=${REFLOAT_ROOT}/lisp/bms.lisp
+      -P "${CMAKE_CURRENT_LIST_DIR}/RefloatGeneratePackageLisp.cmake"
+    DEPENDS
+      "${REFLOAT_PACKAGE_LISP_INPUT}"
+      "${REFLOAT_ROOT}/lisp/bms.lisp"
+      "${REFLOAT_PACKAGE_LIB_BINARY}"
+    COMMENT "Generating package Lisp wrapper"
+    VERBATIM
+  )
+  add_custom_target(refloat-package-lisp DEPENDS "${REFLOAT_PACKAGE_LISP_OUTPUT}")
+
+  add_custom_command(
+    OUTPUT "${REFLOAT_PACKAGE_DESC_OUTPUT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${REFLOAT_PACKAGE_ARTIFACT_DIR}"
+    COMMAND
+      "${CMAKE_COMMAND}"
+      -DREFLOAT_PACKAGE_DESC_INPUT=${REFLOAT_PACKAGE_DESC_INPUT}
+      -DREFLOAT_PACKAGE_DESC_OUTPUT=${REFLOAT_PACKAGE_DESC_OUTPUT}
+      -DREFLOAT_PACKAGE_README_OUTPUT=${REFLOAT_PACKAGE_README_OUTPUT}
+      -DREFLOAT_PACKAGE_QML_OUTPUT=${REFLOAT_PACKAGE_QML_OUTPUT}
+      -DREFLOAT_PACKAGE_LISP_INPUT=${REFLOAT_PACKAGE_LISP_OUTPUT}
+      -DREFLOAT_PACKAGE_ARTIFACT=${REFLOAT_PACKAGE_ARTIFACT}
+      -P "${CMAKE_CURRENT_LIST_DIR}/RefloatGeneratePackageDesc.cmake"
+    DEPENDS
+      "${REFLOAT_PACKAGE_DESC_INPUT}"
+      "${REFLOAT_PACKAGE_README_OUTPUT}"
+      "${REFLOAT_PACKAGE_QML_OUTPUT}"
+      "${REFLOAT_PACKAGE_LISP_OUTPUT}"
+    COMMENT "Generating package descriptor"
+    VERBATIM
+  )
+  add_custom_target(refloat-package-desc DEPENDS "${REFLOAT_PACKAGE_DESC_OUTPUT}")
+
   set(REFLOAT_PACKAGE_LIB_INCLUDE_DIRS
     "${REFLOAT_SRC_DIR}"
+    "${REFLOAT_PACKAGE_GENERATED_SRC_DIR}"
     "${REFLOAT_ROOT}/vesc_pkg_lib"
     "${REFLOAT_ROOT}/vesc_pkg_lib/utils"
   )
@@ -587,6 +621,7 @@ if(REFLOAT_BUILD_PACKAGE)
       OUTPUT "${REFLOAT_PACKAGE_LIB_OBJECT}"
       DEPFILE "${REFLOAT_PACKAGE_LIB_OBJECT}.d"
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${REFLOAT_PACKAGE_LIB_OBJECT_DIR}"
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${REFLOAT_PACKAGE_ARTIFACT_DIR}"
       COMMAND
         "${REFLOAT_ARM_GCC_EXECUTABLE}"
         ${REFLOAT_PACKAGE_LIB_COMPILE_OPTIONS}
@@ -598,7 +633,10 @@ if(REFLOAT_BUILD_PACKAGE)
         -I${REFLOAT_ROOT}/vesc_pkg_lib/stdperiph_stm32f4/CMSIS/include
         -I${REFLOAT_ROOT}/vesc_pkg_lib/stdperiph_stm32f4/CMSIS/ST
         -I${REFLOAT_ROOT}/vesc_pkg_lib/stdperiph_stm32f4/inc
+        -I${REFLOAT_PACKAGE_GENERATED_SRC_DIR}
+        -I${REFLOAT_PACKAGE_CONF_DIR}
         -I${REFLOAT_SRC_DIR}
+        -I${REFLOAT_SRC_DIR}/conf
         -c "${REFLOAT_PACKAGE_LIB_SOURCE}"
         -o "${REFLOAT_PACKAGE_LIB_OBJECT}"
       DEPENDS
@@ -650,13 +688,13 @@ if(REFLOAT_BUILD_PACKAGE)
       -DREFLOAT_ROOT=${REFLOAT_ROOT}
       -DREFLOAT_VESC_TOOL_EXECUTABLE=${REFLOAT_VESC_TOOL_EXECUTABLE}
       -DREFLOAT_PACKAGE_BUILD_LOG=${REFLOAT_PACKAGE_BUILD_LOG}
+      -DREFLOAT_PACKAGE_DESC=${REFLOAT_PACKAGE_DESC_OUTPUT}
       -P "${CMAKE_CURRENT_LIST_DIR}/RefloatBuildPackage.cmake"
-    WORKING_DIRECTORY "${REFLOAT_ROOT}"
     DEPENDS
-      "${REFLOAT_ROOT}/pkgdesc.qml"
+      "${REFLOAT_PACKAGE_DESC_OUTPUT}"
       "${REFLOAT_PACKAGE_README_OUTPUT}"
       "${REFLOAT_PACKAGE_QML_OUTPUT}"
-      "${REFLOAT_ROOT}/lisp/package.lisp"
+      "${REFLOAT_PACKAGE_LISP_OUTPUT}"
       "${REFLOAT_ROOT}/lisp/bms.lisp"
       "${REFLOAT_PACKAGE_LIB_BINARY}"
     COMMENT "Building refloat.vescpkg with vesc_tool"
@@ -672,6 +710,8 @@ if(REFLOAT_BUILD_PACKAGE)
     refloat-package-lib
     refloat-package-readme
     refloat-package-qml
+    refloat-package-lisp
+    refloat-package-desc
   )
 
   add_custom_target(

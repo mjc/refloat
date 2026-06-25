@@ -6,6 +6,10 @@ if(NOT DEFINED REFLOAT_SRC_DIR)
   message(FATAL_ERROR "REFLOAT_SRC_DIR is required")
 endif()
 
+if(NOT DEFINED REFLOAT_CONF_OUTPUT_DIR)
+  message(FATAL_ERROR "REFLOAT_CONF_OUTPUT_DIR is required")
+endif()
+
 if(NOT DEFINED VESC_TOOL_EXECUTABLE)
   message(FATAL_ERROR "VESC_TOOL_EXECUTABLE is required")
 endif()
@@ -20,15 +24,22 @@ string(STRIP "${_refloat_package_name}" _refloat_package_name)
 string(STRIP "${_refloat_version}" _refloat_version)
 string(SUBSTRING "${_refloat_package_name}" 0 20 _refloat_package_name)
 
+file(MAKE_DIRECTORY "${REFLOAT_CONF_OUTPUT_DIR}")
+file(COPY_FILE
+  "${REFLOAT_SRC_DIR}/conf/settings.xml"
+  "${REFLOAT_CONF_OUTPUT_DIR}/settings.xml"
+  ONLY_IF_DIFFERENT
+)
+
 execute_process(
-  COMMAND "${VESC_TOOL_EXECUTABLE}" --xmlConfToCode "${REFLOAT_SRC_DIR}/conf/settings.xml"
-  WORKING_DIRECTORY "${REFLOAT_SRC_DIR}/conf"
+  COMMAND "${VESC_TOOL_EXECUTABLE}" --xmlConfToCode "${REFLOAT_CONF_OUTPUT_DIR}/settings.xml"
+  WORKING_DIRECTORY "${REFLOAT_CONF_OUTPUT_DIR}"
   COMMAND_ERROR_IS_FATAL ANY
 )
 
-file(READ "${REFLOAT_SRC_DIR}/conf/confxml.c" _refloat_confxml)
+file(READ "${REFLOAT_CONF_OUTPUT_DIR}/confxml.c" _refloat_confxml)
 string(REPLACE "uint8_t data_" "__attribute__((used)) uint8_t data_" _refloat_confxml "${_refloat_confxml}")
-file(WRITE "${REFLOAT_SRC_DIR}/conf/confxml.c" "${_refloat_confxml}")
+file(WRITE "${REFLOAT_CONF_OUTPUT_DIR}/confxml.c" "${_refloat_confxml}")
 
 execute_process(
   COMMAND "${GIT_EXECUTABLE}" -C "${REFLOAT_ROOT}" rev-parse --short=8 HEAD
@@ -54,7 +65,7 @@ string(REPLACE "{{PATCH_VERSION}}" "${_refloat_patch}" _refloat_conf_general "${
 string(REPLACE "{{VERSION_SUFFIX}}" "${_refloat_suffix}" _refloat_conf_general "${_refloat_conf_general}")
 string(REPLACE "{{GIT_HASH}}" "${_refloat_git_hash}" _refloat_conf_general "${_refloat_conf_general}")
 
-set(_refloat_conf_general_output "${REFLOAT_SRC_DIR}/conf/conf_general.h")
+set(_refloat_conf_general_output "${REFLOAT_CONF_OUTPUT_DIR}/conf_general.h")
 if(EXISTS "${_refloat_conf_general_output}")
   file(READ "${_refloat_conf_general_output}" _refloat_existing_conf_general)
   if(_refloat_existing_conf_general STREQUAL _refloat_conf_general)

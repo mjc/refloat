@@ -22,8 +22,8 @@ To build the package, run:
 cmake --workflow --preset package
 ```
 
-This builds `refloat.vescpkg` and checks the package payload against the VESC
-package limits.
+This builds `build/package/artifacts/refloat.vescpkg` and checks the package
+payload against the VESC package limits.
 
 To run the host test gate without building the package, use:
 ```sh

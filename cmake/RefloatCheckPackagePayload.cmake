@@ -2,39 +2,24 @@ if(NOT DEFINED REFLOAT_ROOT)
   message(FATAL_ERROR "REFLOAT_ROOT is required")
 endif()
 
-if(NOT DEFINED CMAKE_COMMAND)
-  message(FATAL_ERROR "CMAKE_COMMAND is required")
-endif()
-
 if(NOT DEFINED REFLOAT_PACKAGE_ARTIFACT)
-  set(REFLOAT_PACKAGE_ARTIFACT "${REFLOAT_ROOT}/refloat.vescpkg")
+  message(FATAL_ERROR "REFLOAT_PACKAGE_ARTIFACT is required")
 endif()
 
 if(NOT DEFINED REFLOAT_PACKAGE_BUILD_LOG)
-  set(REFLOAT_PACKAGE_BUILD_LOG "${REFLOAT_ROOT}/build/package/refloat-package.log")
+  message(FATAL_ERROR "REFLOAT_PACKAGE_BUILD_LOG is required")
 endif()
 
 if(NOT DEFINED REFLOAT_PACKAGE_PAYLOAD_LIMIT_BYTES)
   message(FATAL_ERROR "REFLOAT_PACKAGE_PAYLOAD_LIMIT_BYTES is required")
 endif()
 
-if(NOT EXISTS "${REFLOAT_PACKAGE_ARTIFACT}" OR NOT EXISTS "${REFLOAT_PACKAGE_BUILD_LOG}")
-  execute_process(
-    COMMAND "${CMAKE_COMMAND}" --build --preset package
-    WORKING_DIRECTORY "${REFLOAT_ROOT}"
-    RESULT_VARIABLE _refloat_package_result
-  )
-  if(NOT _refloat_package_result EQUAL 0)
-    message(FATAL_ERROR "Package build failed")
-  endif()
-endif()
-
 if(NOT EXISTS "${REFLOAT_PACKAGE_ARTIFACT}")
-  message(FATAL_ERROR "Package build did not create ${REFLOAT_PACKAGE_ARTIFACT}")
+  message(FATAL_ERROR "Missing package artifact ${REFLOAT_PACKAGE_ARTIFACT}; build the refloat-package target first")
 endif()
 
 if(NOT EXISTS "${REFLOAT_PACKAGE_BUILD_LOG}")
-  message(FATAL_ERROR "Package build did not create ${REFLOAT_PACKAGE_BUILD_LOG}")
+  message(FATAL_ERROR "Missing package build log ${REFLOAT_PACKAGE_BUILD_LOG}; build the refloat-package target first")
 endif()
 
 file(READ "${REFLOAT_PACKAGE_BUILD_LOG}" _refloat_package_output)

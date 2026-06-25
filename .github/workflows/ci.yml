@@ -109,12 +109,12 @@ jobs:
         run: cmake --workflow --preset package
 
       - name: Extract config signature
-        run: sed -n 's/^#define .\+_SIGNATURE\W\+\([0-9]*\)/\1/p' src/conf/confparser.h > config_signature.txt
+        run: sed -n 's/^#define .\+_SIGNATURE\W\+\([0-9]*\)/\1/p' build/package/generated-package-src/conf/confparser.h > config_signature.txt
 
       - name: Rename package files
         run: |
-          mv refloat.vescpkg refloat-${{env.VERSION}}.vescpkg
-          mv src/package_lib.elf refloat-${{env.VERSION}}.elf
+          mv build/package/artifacts/refloat.vescpkg refloat-${{env.VERSION}}.vescpkg
+          mv build/package/artifacts/package_lib.elf refloat-${{env.VERSION}}.elf
 
       - name: Install changelog dependencies
         run: sudo apt-get install python3-git
