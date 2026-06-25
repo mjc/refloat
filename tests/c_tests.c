@@ -147,7 +147,7 @@ int main(void) {
                 "shortens the fixed buffer retention window instead of recomputing the "
                 "same at-least-ten-second coverage used during initialization"),
         TEST_CASE("data recorder status and data serialization", test_data_recorder_status_and_data_serialization),
-        XFAIL_CASE("data recorder rejects tiny backing buffer", test_data_recorder_rejects_tiny_backing_buffer,
+        RED_XFAIL_CASE("data recorder rejects tiny backing buffer", test_data_recorder_rejects_tiny_backing_buffer,
                 "red test: data_recorder_init trusts firmware-provided buffer length after "
                 "the magic check, so a nonzero buffer smaller than one Sample produces "
                 "sample_count == 0 and divides by sample_count while computing decimation "
@@ -175,7 +175,7 @@ int main(void) {
         TEST_CASE("torque tilt negative limit and regen edges", test_torque_tilt_negative_limit_and_regen_edges),
         TEST_CASE("motor control current brake and tone", test_motor_control_current_brake_and_tone),
         TEST_CASE("motor control parking and tone edges", test_motor_control_parking_and_tone_edges),
-        XFAIL_CASE("motor control zero tone frequency", test_motor_control_zero_tone_frequency,
+        RED_XFAIL_CASE("motor control zero tone frequency", test_motor_control_zero_tone_frequency,
                 "red test: deserialized haptic tone config can set frequency to zero, and "
                 "motor_control_play_tone divides main_freq by that frequency instead of "
                 "ignoring or sanitizing the invalid tone"),

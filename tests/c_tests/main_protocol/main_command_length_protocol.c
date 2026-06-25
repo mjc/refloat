@@ -56,7 +56,7 @@ static bool test_main_rejects_short_lock_and_handtest_payloads(void) {
 
     main_protocol_fixture_stop(&fixture);
 
-    XEXPECT_TRUE(lock_ok);
-    XEXPECT_TRUE(handtest_ok);
+    RED_EXPECT_TRUE(lock_ok);
+    RED_EXPECT_TRUE(handtest_ok);
     return true;
 }

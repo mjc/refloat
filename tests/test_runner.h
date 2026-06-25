@@ -31,10 +31,17 @@ typedef struct {
     const char *name;
     TestFn fn;
     const char *xfail_reason;
+    bool explicit_red;
 } TestCase;
 
-#define TEST_CASE(name_, fn_) {.name = (name_), .fn = (fn_), .xfail_reason = NULL}
-#define XFAIL_CASE(name_, fn_, reason_) {.name = (name_), .fn = (fn_), .xfail_reason = (reason_)}
+static inline void test_red_mark_observed(void);
+
+#define TEST_CASE(name_, fn_)                                                                      \
+    {.name = (name_), .fn = (fn_), .xfail_reason = NULL, .explicit_red = false}
+#define XFAIL_CASE(name_, fn_, reason_)                                                            \
+    {.name = (name_), .fn = (fn_), .xfail_reason = (reason_), .explicit_red = false}
+#define RED_XFAIL_CASE(name_, fn_, reason_)                                                        \
+    {.name = (name_), .fn = (fn_), .xfail_reason = (reason_), .explicit_red = true}
 
 static inline void test_report_expr_failure(const char *file, int line, const char *expr) {
     fprintf(stderr, "%s:%d: check failed: %s\n", file, line, expr);
@@ -134,6 +141,77 @@ static inline void test_report_float_failure(
         }                                                                                          \
     } while (0)
 
+#define RED_EXPECT_TRUE(expr)                                                                      \
+    do {                                                                                           \
+        if (!(expr)) {                                                                             \
+            test_red_mark_observed();                                                              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
+
+#define RED_EXPECT_FALSE(expr)                                                                     \
+    do {                                                                                           \
+        if (expr) {                                                                                \
+            test_red_mark_observed();                                                              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
+
+#define RED_EXPECT_EQ_U32(actual, expected)                                                        \
+    do {                                                                                           \
+        uint32_t actual__ = (actual);                                                              \
+        uint32_t expected__ = (expected);                                                          \
+        if (actual__ != expected__) {                                                              \
+            test_red_mark_observed();                                                              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
+
+#define RED_EXPECT_EQ_SIZE(actual, expected)                                                       \
+    do {                                                                                           \
+        size_t actual__ = (actual);                                                                \
+        size_t expected__ = (expected);                                                            \
+        if (actual__ != expected__) {                                                              \
+            test_red_mark_observed();                                                              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
+
+#define RED_EXPECT_EQ_PTR(actual, expected)                                                        \
+    do {                                                                                           \
+        const void *actual__ = (const void *) (actual);                                            \
+        const void *expected__ = (const void *) (expected);                                        \
+        if (actual__ != expected__) {                                                              \
+            test_red_mark_observed();                                                              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
+
+#define RED_EXPECT_FLOAT_NEAR_EPS(actual, expected, eps)                                           \
+    do {                                                                                           \
+        float actual__ = (actual);                                                                 \
+        float expected__ = (expected);                                                             \
+        float eps__ = (eps);                                                                       \
+        if (fabsf(actual__ - expected__) > eps__) {                                                \
+            test_red_mark_observed();                                                              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
+
+#define RED_EXPECT_FLOAT_NEAR(actual, expected)                                                    \
+    RED_EXPECT_FLOAT_NEAR_EPS(actual, expected, TEST_FLOAT_EPS)
+
+#define RED_EXPECT_MEM_EQ(actual, expected, len)                                                   \
+    do {                                                                                           \
+        const void *actual__ = (const void *) (actual);                                            \
+        const void *expected__ = (const void *) (expected);                                        \
+        size_t len__ = (len);                                                                      \
+        if (memcmp(actual__, expected__, len__) != 0) {                                            \
+            test_red_mark_observed();                                                              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
+
 #define XEXPECT_TRUE(expr) EXPECT_TRUE(expr)
 
 #define XEXPECT_FALSE(expr) XEXPECT_TRUE(!(expr))
@@ -199,6 +277,12 @@ static inline void test_report_float_failure(
 // One in-flight guard per test binary; these host tests run serially.
 typedef bool (*TestSignalCallback)(void *ctx);
 
+static bool test_red_observed = false;
+
+static inline void test_red_mark_observed(void) {
+    test_red_observed = true;
+}
+
 typedef struct {
     int signo;
     sigjmp_buf env;
@@ -231,9 +315,28 @@ static inline bool test_expect_no_signal(int signo, TestSignalCallback fn, void 
 }
 
 static inline int run_test_case(const TestCase *test_case, size_t *passes, size_t *xfails, size_t *failures) {
+    test_red_observed = false;
     bool ok = test_case->fn();
 
     if (test_case->xfail_reason != NULL) {
+        if (test_case->explicit_red) {
+            if (!ok && test_red_observed) {
+                printf("XFAIL %s: %s\n", test_case->name, test_case->xfail_reason);
+                ++(*xfails);
+                return 0;
+            }
+
+            if (!ok) {
+                fprintf(stderr, "FAIL  %s\n", test_case->name);
+                ++(*failures);
+                return 1;
+            }
+
+            fprintf(stderr, "XPASS %s: %s\n", test_case->name, test_case->xfail_reason);
+            ++(*failures);
+            return 1;
+        }
+
         if (ok) {
             fprintf(stderr, "XPASS %s: %s\n", test_case->name, test_case->xfail_reason);
             ++(*failures);

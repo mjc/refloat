@@ -347,7 +347,7 @@ static bool test_data_recorder_rejects_tiny_backing_buffer(void) {
     vesc_if_fake_set_data_buffer(0xcafe1011u, tiny_storage, sizeof(tiny_storage));
 
     DataRecorderTinyBufferGuard guard = {.dr = &dr, .sample_rate = 100u};
-    EXPECT_TRUE(test_expect_no_signal(SIGFPE, run_data_recorder_init, &guard));
+    RED_EXPECT_TRUE(test_expect_no_signal(SIGFPE, run_data_recorder_init, &guard));
 
     EXPECT_TRUE(!data_recorder_has_capability(&dr));
     EXPECT_TRUE(!dr.recording);

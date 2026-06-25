@@ -77,7 +77,7 @@ static bool test_main_init_main_thread_spawn_failure_cleans_up(void) {
     EXPECT_EQ_U32(vesc_if_fake_imu_set_read_callback_calls(), 0u);
     EXPECT_EQ_U32(vesc_if_fake_set_app_data_handler_calls(), 0u);
     EXPECT_EQ_U32(vesc_if_fake_conf_custom_clear_configs_calls(), 0u);
-    EXPECT_TRUE(vesc_if_fake_free_calls() == vesc_if_fake_malloc_calls());
+    RED_EXPECT_TRUE(vesc_if_fake_free_calls() == vesc_if_fake_malloc_calls());
 
     return true;
 }
@@ -94,7 +94,7 @@ static bool test_main_init_aux_thread_spawn_failure_cleans_up(void) {
     EXPECT_EQ_U32(vesc_if_fake_imu_set_read_callback_calls(), 0u);
     EXPECT_EQ_U32(vesc_if_fake_set_app_data_handler_calls(), 0u);
     EXPECT_EQ_U32(vesc_if_fake_conf_custom_clear_configs_calls(), 0u);
-    EXPECT_TRUE(vesc_if_fake_free_calls() == vesc_if_fake_malloc_calls());
+    RED_EXPECT_TRUE(vesc_if_fake_free_calls() == vesc_if_fake_malloc_calls());
 
     return true;
 }
@@ -112,9 +112,9 @@ static bool test_main_init_eeprom_allocation_failure_uses_defaults(void) {
     Data *d = (Data *) info.arg;
     RefloatConfig expected = {0};
     confparser_set_defaults_refloatconfig(&expected);
-    EXPECT_TRUE(d->float_conf.inputtilt_remote_type == expected.inputtilt_remote_type);
-    EXPECT_FLOAT_NEAR(d->float_conf.tiltback_constant, expected.tiltback_constant);
-    EXPECT_FLOAT_NEAR(d->float_conf.leds.front.brightness, expected.leds.front.brightness);
+    RED_EXPECT_TRUE(d->float_conf.inputtilt_remote_type == expected.inputtilt_remote_type);
+    RED_EXPECT_FLOAT_NEAR(d->float_conf.tiltback_constant, expected.tiltback_constant);
+    RED_EXPECT_FLOAT_NEAR(d->float_conf.leds.front.brightness, expected.leds.front.brightness);
 
     info.stop_fun(info.arg);
 

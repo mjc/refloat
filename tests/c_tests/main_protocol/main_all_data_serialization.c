@@ -20,7 +20,7 @@ static bool test_main_all_data_saturates_oversized_float16_fields(void) {
     EXPECT_EQ_U32(payload[2], 2u);
 
     int32_t index = 3;
-    EXPECT_EQ_U32(buffer_get_uint16(payload, &index), 0x7fffu);
+    RED_EXPECT_EQ_U32(buffer_get_uint16(payload, &index), 0x7fffu);
 
     main_protocol_fixture_stop(&fixture);
     return true;

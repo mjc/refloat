@@ -159,7 +159,7 @@ static bool test_motor_control_zero_tone_frequency(void) {
     motor_control_fixture_configure(&fixture, 6.0f, 0.0f, PARKING_BRAKE_NEVER, 1000u);
 
     MotorControlToneGuard guard = {.mc = &fixture.mc, .frequency = 0u, .intensity = 1.0f};
-    EXPECT_TRUE(test_expect_no_signal(SIGFPE, run_motor_control_play_tone, &guard));
+    RED_EXPECT_TRUE(test_expect_no_signal(SIGFPE, run_motor_control_play_tone, &guard));
 
     EXPECT_EQ_U32(fixture.mc.tone_ticks, 0u);
     EXPECT_EQ_U32(fixture.mc.tone_counter, 0u);
