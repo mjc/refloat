@@ -122,6 +122,23 @@ check-qml-behavior:
 
 check-smoke: check-qml-behavior
 
+help:
+	@printf '%s\n' \
+		'Targets:' \
+		'  make              build the host test binaries' \
+		'  make check        build and run all host tests' \
+		'  make check-main   run only the main protocol host tests' \
+		'  make check-qml-behavior run the QML behavior check' \
+		'  make check-smoke  run the smoke checks' \
+		'  make generated_conf generate the config sources used by the host tests' \
+		'  make print-test-sources   print the resolved test source list' \
+		'  make print-main-sources   print the resolved main-test source list' \
+		'  make print-leds-sources   print the resolved LED-test source list' \
+		'  make print-test-objects   print the resolved test object list' \
+		'  make print-main-objects   print the resolved main-test object list' \
+		'  make print-leds-objects   print the resolved LED-test object list' \
+		'  make clean        remove test build outputs'
+
 print-test-sources:
 	@printf '%s\n' $(TEST_SOURCES)
 
@@ -145,7 +162,7 @@ clean:
 
 -include $(DEPFILES)
 
-.PHONY: all check check-qml-behavior check-smoke clean sync-build-artifacts
+.PHONY: all check check-qml-behavior check-smoke clean sync-build-artifacts help
 .PHONY: print-test-sources print-main-sources print-leds-sources
 .PHONY: print-test-objects print-main-objects print-leds-objects
 .PHONY: generated_conf check-main

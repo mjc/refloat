@@ -68,7 +68,16 @@ conf/conf_general.h: FORCE conf/conf_general.h.in ../package_name ../version $(G
 
 FORCE:
 
-.PHONY: FORCE print-sources print-objects print-artifacts
+.PHONY: FORCE print-sources print-objects print-artifacts help
+
+help:
+	@printf '%s\n' \
+		'Targets:' \
+		'  make              build package_lib' \
+		'  make print-sources print the resolved source list' \
+		'  make print-objects print the resolved object list' \
+		'  make print-artifacts print the package_lib artifact names' \
+		'  make clean        remove generated config and package outputs'
 
 print-sources:
 	@printf '%s\n' $(SOURCES)

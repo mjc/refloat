@@ -83,6 +83,8 @@ help:
 		'  make check        run the full automated test gate' \
 		'  make package      same as make' \
 		'  make package-only build refloat.vescpkg without running tests' \
+		'  make -C tests help  inspect the host-test build surface' \
+		'  make -C src help    inspect the package-lib build surface' \
 		'  make clean        remove generated package and firmware artifacts' \
 		'' \
 		'Options:' \
