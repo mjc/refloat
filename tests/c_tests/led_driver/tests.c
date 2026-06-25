@@ -115,10 +115,10 @@ static bool test_led_driver_rejects_invalid_color_order(void) {
     };
     const LedStrip *strips[STRIP_COUNT] = {&strip, NULL};
 
-    EXPECT_TRUE(!led_driver_setup(&fixture.driver, LED_PIN_B6, LED_PIN_CFG_NO_PULLUP, strips));
-    EXPECT_TRUE(fixture.driver.bitbuffer == NULL);
-    EXPECT_TRUE(fixture.driver.bitbuffer_length == 0);
-    EXPECT_TRUE(vesc_if_fake_set_pad_mode_calls() == 0);
+    RED_EXPECT_TRUE(!led_driver_setup(&fixture.driver, LED_PIN_B6, LED_PIN_CFG_NO_PULLUP, strips));
+    RED_EXPECT_TRUE(fixture.driver.bitbuffer == NULL);
+    RED_EXPECT_TRUE(fixture.driver.bitbuffer_length == 0);
+    RED_EXPECT_TRUE(vesc_if_fake_set_pad_mode_calls() == 0);
 
     led_driver_paint(&fixture.driver);
     EXPECT_TRUE(fixture.driver.bitbuffer == NULL);
@@ -143,10 +143,10 @@ static bool test_led_driver_rejects_oversized_strip_count(void) {
         led_driver_fixture_destroy(&fixture);
     }
 
-    EXPECT_TRUE(!setup_ok);
-    EXPECT_TRUE(fixture.driver.bitbuffer == NULL);
-    EXPECT_TRUE(fixture.driver.bitbuffer_length == 0);
-    EXPECT_TRUE(vesc_if_fake_set_pad_mode_calls() == 0);
+    RED_EXPECT_TRUE(!setup_ok);
+    RED_EXPECT_TRUE(fixture.driver.bitbuffer == NULL);
+    RED_EXPECT_TRUE(fixture.driver.bitbuffer_length == 0);
+    RED_EXPECT_TRUE(vesc_if_fake_set_pad_mode_calls() == 0);
 
     return true;
 }

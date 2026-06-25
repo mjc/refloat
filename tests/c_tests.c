@@ -124,11 +124,11 @@ int main(void) {
         TEST_CASE("led strip", test_led_strip),
         TEST_CASE("led driver setup and color encoding", test_led_driver_setup_and_color_encoding),
         TEST_CASE("led driver rejects invalid pin", test_led_driver_rejects_invalid_pin),
-        XFAIL_CASE("led driver rejects invalid color order", test_led_driver_rejects_invalid_color_order,
+        RED_XFAIL_CASE("led driver rejects invalid color order", test_led_driver_rejects_invalid_color_order,
                 "red test: LED color order is config-driven, and led_driver_paint switches "
                 "without a default before calling color_conv, so an invalid color order can "
                 "leave an indeterminate function pointer instead of being rejected before setup"),
-        XFAIL_CASE("led driver rejects oversized strip count", test_led_driver_rejects_oversized_strip_count,
+        RED_XFAIL_CASE("led driver rejects oversized strip count", test_led_driver_rejects_oversized_strip_count,
                 "red test: hardware LED strip counts are config-driven with a documented max "
                 "of 30 per strip, but led_driver_setup currently trusts the strip length and "
                 "can allocate/arm DMA for malformed oversized configs instead of rejecting them"),
