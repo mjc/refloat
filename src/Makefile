@@ -10,7 +10,14 @@ TARGET = package_lib
 
 all: $(TARGET)
 
-REFLOAT_SOURCES = $(wildcard *.c) $(wildcard filters/*.c) $(wildcard lib/*.c)
+# Recursively discover project sources so new modules do not require Makefile
+# edits, while the existing object+depfile flow keeps the header graph accurate.
+define find_local_c_sources
+$(strip $(shell find $(1) -type f -name '*.c' -print | LC_ALL=C sort | sed 's#^\./##'))
+endef
+
+DISCOVERED_SOURCES := $(call find_local_c_sources,.)
+REFLOAT_SOURCES := $(filter-out conf/buffer.c conf/confparser.c conf/confxml.c,$(DISCOVERED_SOURCES))
 CONF_GEN_HEADERS = conf/conf_default.h conf/confparser.h conf/confxml.h
 CONF_GEN_SOURCES = conf/confparser.c conf/confxml.c
 CONF_GEN_FILES = $(CONF_GEN_HEADERS) $(CONF_GEN_SOURCES)
