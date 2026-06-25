@@ -73,6 +73,18 @@
       }
     },
     {
+      "name": "red",
+      "configurePreset": "host",
+      "filter": {
+        "include": {
+          "label": "red"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
       "name": "package",
       "configurePreset": "package",
       "filter": {

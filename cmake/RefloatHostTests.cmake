@@ -117,13 +117,18 @@ target_compile_options(
     "$<$<BOOL:${REFLOAT_STRICT_WARNINGS}>:-Werror>"
 )
 
-function(refloat_add_cpp_test target source test_name)
+function(refloat_add_cpp_test target test_name)
   set(options)
   set(oneValueArgs)
-  set(multiValueArgs LINK_LIBRARIES LABELS COMPILE_DEFINITIONS DEPENDS)
+  set(multiValueArgs SOURCES LINK_LIBRARIES LABELS COMPILE_DEFINITIONS DEPENDS)
   cmake_parse_arguments(REFLOAT_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-  add_executable(${target} ${source})
+  if(NOT REFLOAT_TEST_SOURCES)
+    message(FATAL_ERROR "refloat_add_cpp_test(${target}) requires SOURCES")
+  endif()
+
+  add_executable(${target})
+  target_sources(${target} PRIVATE ${REFLOAT_TEST_SOURCES})
   target_link_libraries(
     ${target}
     PRIVATE
@@ -135,10 +140,11 @@ function(refloat_add_cpp_test target source test_name)
     target_compile_definitions(${target} PRIVATE ${REFLOAT_TEST_COMPILE_DEFINITIONS})
   endif()
   add_dependencies(${target} refloat_generated_conf ${REFLOAT_TEST_DEPENDS})
-  add_test(NAME ${test_name} COMMAND ${target})
-  if(REFLOAT_TEST_LABELS)
-    set_tests_properties(${test_name} PROPERTIES LABELS "${REFLOAT_TEST_LABELS}")
-  endif()
+  catch_discover_tests(
+    ${target}
+    TEST_PREFIX "${test_name}."
+    PROPERTIES LABELS "${REFLOAT_TEST_LABELS}"
+  )
 endfunction()
 
 add_custom_command(
@@ -293,8 +299,9 @@ add_dependencies(refloat_main_bridge refloat_generated_conf)
 
 refloat_add_cpp_test(
   refloat-cpp-main-lifecycle-tests
-  "${REFLOAT_TEST_DIR}/cpp/main/main_lifecycle_test.cpp"
   cpp.main-lifecycle
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/main/main_lifecycle_test.cpp"
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
@@ -303,8 +310,9 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-command-length-tests
-  "${REFLOAT_TEST_DIR}/cpp/main/main_command_length_test.cpp"
   cpp.main-command-length
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/main/main_command_length_test.cpp"
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
@@ -313,8 +321,9 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-protocol-tests
-  "${REFLOAT_TEST_DIR}/cpp/main/main_alerts_lights_test.cpp"
   cpp.main-protocol
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/main/main_alerts_lights_test.cpp"
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
@@ -323,8 +332,9 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-all-data-tests
-  "${REFLOAT_TEST_DIR}/cpp/main/main_all_data_test.cpp"
   cpp.main-all-data
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/main/main_all_data_test.cpp"
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
@@ -333,8 +343,9 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-gnss-tests
-  "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_test.cpp"
   cpp.main-gnss
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_test.cpp"
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
@@ -343,8 +354,9 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-gnss-missing-tests
-  "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_unavailable_test.cpp"
   cpp.main-gnss-missing
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_unavailable_test.cpp"
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
@@ -355,8 +367,9 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-main-gnss-null-tests
-  "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_unavailable_test.cpp"
   cpp.main-gnss-null
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/main/main_gnss_unavailable_test.cpp"
   LINK_LIBRARIES
     refloat_main_bridge
   LABELS
@@ -370,8 +383,9 @@ target_link_libraries(refloat_cpp_circular_buffer PRIVATE refloat_host_c_options
 
 refloat_add_cpp_test(
   refloat-cpp-circular-buffer-tests
-  "${REFLOAT_TEST_DIR}/cpp/core/circular_buffer_test.cpp"
   cpp.circular-buffer
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/core/circular_buffer_test.cpp"
   LINK_LIBRARIES
     refloat_cpp_circular_buffer
     refloat_led_driver_fake
@@ -381,8 +395,9 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-cpp-leds-tests
-  "${REFLOAT_TEST_DIR}/cpp/leds/leds_test.cpp"
   cpp.leds
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/leds/leds_test.cpp"
   LINK_LIBRARIES
     refloat_host_common
     refloat_led_common
@@ -394,8 +409,9 @@ refloat_add_cpp_test(
 
 refloat_add_cpp_test(
   refloat-generated-config-tests
-  "${REFLOAT_TEST_DIR}/cpp/config/generated_config_parser_test.cpp"
   cpp.generated-config
+  SOURCES
+    "${REFLOAT_TEST_DIR}/cpp/config/generated_config_parser_test.cpp"
   LINK_LIBRARIES
     refloat_conf_support
   LABELS
