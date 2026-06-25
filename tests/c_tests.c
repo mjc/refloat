@@ -135,13 +135,13 @@ int main(void) {
         TEST_CASE("led driver alternate pins and noop paths", test_led_driver_alternate_pins_and_noop_paths),
         TEST_CASE("led driver full brightness color orders", test_led_driver_full_brightness_color_orders),
         TEST_CASE("data recorder requests", test_data_recorder_requests),
-        XFAIL_CASE("data recorder experiment plot export", test_data_recorder_experiment_plot_export,
+        RED_XFAIL_CASE("data recorder experiment plot export", test_data_recorder_experiment_plot_export,
                 "red test: data_recorder_send_experiment_plot iterates multi-byte Sample records "
                 "through circular_buffer_iterate, which currently passes byte-offset item "
                 "addresses instead of item_size-scaled addresses"),
         TEST_CASE("data recorder request edges", test_data_recorder_request_edges),
         TEST_CASE("data recorder decimation and sample flags", test_data_recorder_decimation_and_sample_flags),
-        XFAIL_CASE("data recorder sample rate recomputes decimation", test_data_recorder_sample_rate_recomputes_decimation,
+        RED_XFAIL_CASE("data recorder sample rate recomputes decimation", test_data_recorder_sample_rate_recomputes_decimation,
                 "red test: data_recorder_set_sample_rate updates sample_rate but leaves "
                 "decimation stale, so a higher measured IMU rate records too often and "
                 "shortens the fixed buffer retention window instead of recomputing the "
@@ -152,7 +152,7 @@ int main(void) {
                 "the magic check, so a nonzero buffer smaller than one Sample produces "
                 "sample_count == 0 and divides by sample_count while computing decimation "
                 "instead of rejecting the recorder as unavailable"),
-        XFAIL_CASE("data recorder data send pauses recording", test_data_recorder_data_send_pauses_recording,
+        RED_XFAIL_CASE("data recorder data send pauses recording", test_data_recorder_data_send_pauses_recording,
                 "red test: DATA_RECORD header requests pause recording before export, but "
                 "direct DATA_RECORD data-send requests leave recording active while walking "
                 "the circular buffer, so concurrent sampling can mutate the export window "

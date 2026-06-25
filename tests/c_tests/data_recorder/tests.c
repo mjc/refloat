@@ -132,16 +132,16 @@ static bool test_data_recorder_experiment_plot_export(void) {
 
     data_recorder_send_experiment_plot(&fixture.dr);
 
-    EXPECT_TRUE(vesc_if_fake_plot_init_calls() == 1);
-    EXPECT_TRUE(vesc_if_fake_plot_add_graph_calls() == ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS));
-    EXPECT_TRUE(
+    RED_EXPECT_TRUE(vesc_if_fake_plot_init_calls() == 1);
+    RED_EXPECT_TRUE(vesc_if_fake_plot_add_graph_calls() == ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS));
+    RED_EXPECT_TRUE(
         vesc_if_fake_plot_set_graph_calls() ==
         circular_buffer_size(&fixture.dr.buffer) * ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS)
     );
-    EXPECT_TRUE(vesc_if_fake_plot_send_points_calls() == vesc_if_fake_plot_set_graph_calls());
-    EXPECT_TRUE(vesc_if_fake_last_plot_graph() == (int) ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS) - 1);
-    EXPECT_FLOAT_NEAR(vesc_if_fake_last_plot_x(), 222.0f);
-    EXPECT_TRUE(vesc_if_fake_last_plot_y() != 0.0f);
+    RED_EXPECT_TRUE(vesc_if_fake_plot_send_points_calls() == vesc_if_fake_plot_set_graph_calls());
+    RED_EXPECT_TRUE(vesc_if_fake_last_plot_graph() == (int) ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS) - 1);
+    RED_EXPECT_FLOAT_NEAR(vesc_if_fake_last_plot_x(), 222.0f);
+    RED_EXPECT_TRUE(vesc_if_fake_last_plot_y() != 0.0f);
 
     return true;
 }
@@ -250,12 +250,12 @@ static bool test_data_recorder_sample_rate_recomputes_decimation(void) {
     data_recorder_fixture_start(&fixture, storage, 100, true, false, false, false, 10, 100, 100);
 
     data_recorder_set_sample_rate(&fixture.dr, 200);
-    EXPECT_EQ_U32(fixture.dr.sample_rate, 200u);
-    EXPECT_EQ_U32(fixture.dr.decimation, 20u);
+    RED_EXPECT_EQ_U32(fixture.dr.sample_rate, 200u);
+    RED_EXPECT_EQ_U32(fixture.dr.decimation, 20u);
 
     data_recorder_set_sample_rate(&fixture.dr, 5);
-    EXPECT_EQ_U32(fixture.dr.sample_rate, 5u);
-    EXPECT_EQ_U32(fixture.dr.decimation, 1u);
+    RED_EXPECT_EQ_U32(fixture.dr.sample_rate, 5u);
+    RED_EXPECT_EQ_U32(fixture.dr.decimation, 1u);
 
     return true;
 }
@@ -369,9 +369,9 @@ static bool test_data_recorder_data_send_pauses_recording(void) {
 
     size_t len = 0;
     const uint8_t *payload = SEND_DATA_RECORDER_REQUEST(&fixture.dr, len, 2, 2, 0, 0, 0, 0);
-    EXPECT_TRUE(payload != NULL);
-    EXPECT_EQ_U32(payload[1], 43u);
-    EXPECT_TRUE(!fixture.dr.recording);
+    RED_EXPECT_TRUE(payload != NULL);
+    RED_EXPECT_EQ_U32(payload[1], 43u);
+    RED_EXPECT_TRUE(!fixture.dr.recording);
 
     return true;
 }
