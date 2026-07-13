@@ -41,11 +41,11 @@ void time_init(Time *t);
 
 void time_update(Time *t, RunState state);
 
-inline void time_refresh_idle(Time *t) {
+static inline void time_refresh_idle(Time *t) {
     t->idle_timer = t->now;
 }
 
-inline void timer_refresh(const Time *t, time_t *timer) {
+static inline void timer_refresh(const Time *t, time_t *timer) {
     *timer = t->now;
 }
 
@@ -53,20 +53,29 @@ inline void timer_refresh(const Time *t, time_t *timer) {
  * Sets the timer to an already-expired state, as if it was last refreshed
  * `age` seconds ago.
  */
-inline void timer_expire(const Time *t, time_t *timer, float age) {
+static inline void timer_expire(const Time *t, time_t *timer, float age) {
     *timer = t->now - (time_t) (age * SYSTEM_TICK_RATE_HZ);
 }
 
-inline bool timer_older(const Time *t, time_t timer, float seconds) {
+static inline bool timer_older(const Time *t, time_t timer, float seconds) {
     return t->now - timer > (time_t) (seconds * SYSTEM_TICK_RATE_HZ);
 }
 
-inline bool timer_older_ms(const Time *t, time_t timer, float seconds) {
+static inline bool timer_older_ms(const Time *t, time_t timer, float seconds) {
     return t->now - timer > (time_t) (seconds * SYSTEM_TICK_RATE_HZ / 1000);
 }
 
-inline float timer_age(const Time *t, time_t timer) {
+static inline float timer_age(const Time *t, time_t timer) {
     return (t->now - timer) * (1.0f / SYSTEM_TICK_RATE_HZ);
+}
+
+// VESC's float system_time() is derived from the wrapping 32-bit system tick.
+static inline float system_time_age(float now, float timer) {
+    float age = now - timer;
+    if (age < 0.0f) {
+        age += 4294967296.0f / SYSTEM_TICK_RATE_HZ;
+    }
+    return age;
 }
 
 #define time_elapsed(t, event, seconds)                                                            \

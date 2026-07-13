@@ -17,6 +17,8 @@
 
 #include "footpad_sensor.h"
 
+#include <math.h>
+
 #include "vesc_c_if.h"
 
 void footpad_sensor_init(FootpadSensor *fs) {
@@ -30,8 +32,10 @@ void footpad_sensor_update(FootpadSensor *fs, const RefloatConfig *config) {
     float adc1 = VESC_IF->io_read_analog(VESC_PIN_ADC1);
     float adc2 = VESC_IF->io_read_analog(VESC_PIN_ADC2);
 
-    bool adc1_on = config->fault_adc1 == 0.0f || adc1 > config->fault_adc1;
-    bool adc2_on = config->fault_adc2 == 0.0f || adc2 > config->fault_adc2;
+    float adc1_threshold = fmaxf(config->fault_adc1, 0.0f);
+    float adc2_threshold = fmaxf(config->fault_adc2, 0.0f);
+    bool adc1_on = adc1_threshold == 0.0f || adc1 > adc1_threshold;
+    bool adc2_on = adc2_threshold == 0.0f || adc2 > adc2_threshold;
 
     if (config->hardware.swap_footpad_adcs) {
         fs->adc_left = adc2;
@@ -41,7 +45,7 @@ void footpad_sensor_update(FootpadSensor *fs, const RefloatConfig *config) {
         fs->adc_right = adc2;
     }
 
-    if (config->fault_adc1 == 0.0f || config->fault_adc2 == 0.0f) {
+    if (adc1_threshold == 0.0f || adc2_threshold == 0.0f) {
         // No or single sensor: report FS_BOTH when the (single) sensor is on, FS_NONE otherwise
         fs->state = (adc1_on && adc2_on) ? FS_BOTH : FS_NONE;
     } else if (config->hardware.swap_footpad_adcs) {

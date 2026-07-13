@@ -100,7 +100,7 @@ p, li { white-space: pre-wrap; }
             <editorDecimalsDouble>3</editorDecimalsDouble>
             <editorScale>1</editorScale>
             <editAsPercentage>0</editAsPercentage>
-            <maxDouble>0.5</maxDouble>
+            <maxDouble>0.327</maxDouble>
             <minDouble>0</minDouble>
             <showDisplay>0</showDisplay>
             <stepDouble>0.005</stepDouble>
@@ -495,6 +495,8 @@ p, li { white-space: pre-wrap; }
             <cDefine>CFG_DFLT_FAULT_ADC_HALF_ERPM</cDefine>
             <editorScale>1</editorScale>
             <editAsPercentage>0</editAsPercentage>
+            <!-- vTx 3 wraps 100000 to 34464, about 82 mph with a 30-pole
+                 Superflux HS and nominal 12-inch direct-drive tire. -->
             <maxInt>100000</maxInt>
             <minInt>0</minInt>
             <showDisplay>0</showDisplay>
@@ -899,6 +901,8 @@ p, li { white-space: pre-wrap; }
             <cDefine>CFG_DFLT_TILTBACK_CONSTANT_ERPM</cDefine>
             <editorScale>1</editorScale>
             <editAsPercentage>0</editAsPercentage>
+            <!-- vTx 3 wraps 100000 to 34464, about 82 mph with a 30-pole
+                 Superflux HS and nominal 12-inch direct-drive tire. -->
             <maxInt>100000</maxInt>
             <minInt>200</minInt>
             <showDisplay>0</showDisplay>
@@ -963,6 +967,8 @@ p, li { white-space: pre-wrap; }
             <cDefine>CFG_DFLT_TILTBACK_VARIABLE_ERPM</cDefine>
             <editorScale>1</editorScale>
             <editAsPercentage>0</editAsPercentage>
+            <!-- vTx 3 wraps 100000 to 34464, about 82 mph with a 30-pole
+                 Superflux HS and nominal 12-inch direct-drive tire. -->
             <maxInt>100000</maxInt>
             <minInt>0</minInt>
             <showDisplay>0</showDisplay>
@@ -2562,6 +2568,8 @@ p, li { white-space: pre-wrap; }
             <cDefine>CFG_DFLT_TURNTILT_START_ERPM</cDefine>
             <editorScale>1</editorScale>
             <editAsPercentage>0</editAsPercentage>
+            <!-- vTx 3 wraps 100000 to 34464, about 82 mph with a 30-pole
+                 Superflux HS and nominal 12-inch direct-drive tire. -->
             <maxInt>100000</maxInt>
             <minInt>100</minInt>
             <showDisplay>0</showDisplay>
@@ -2606,6 +2614,8 @@ p, li { white-space: pre-wrap; }
             <cDefine>CFG_DFLT_TURNTILT_ERPM_BOOST_END</cDefine>
             <editorScale>1</editorScale>
             <editAsPercentage>0</editAsPercentage>
+            <!-- vTx 3 wraps 100000 to 34464, about 82 mph with a 30-pole
+                 Superflux HS and nominal 12-inch direct-drive tire. -->
             <maxInt>100000</maxInt>
             <minInt>100</minInt>
             <showDisplay>0</showDisplay>
@@ -2626,7 +2636,7 @@ p, li { white-space: pre-wrap; }
             <cDefine>CFG_DFLT_TURNTILT_YAW_AGGREGATE</cDefine>
             <editorScale>1</editorScale>
             <editAsPercentage>0</editAsPercentage>
-            <maxInt>360</maxInt>
+            <maxInt>255</maxInt>
             <minInt>50</minInt>
             <showDisplay>0</showDisplay>
             <stepInt>5</stepInt>

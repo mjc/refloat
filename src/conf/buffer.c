@@ -18,9 +18,8 @@
 #include "buffer.h"
 #include <math.h>
 #include <stdbool.h>
+#include <string.h>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 // clang-format off
 
 // IEEE-754 16-bit floating-point format (without infinity and NaNs)
@@ -31,17 +30,38 @@
 //
 // https://stackoverflow.com/a/60047308
 uint16_t to_float16(float x) {
+    if (!isfinite(x)) {
+        return 0;
+    }
+
     // round-to-nearest-even: add last bit after truncated mantissa
-    const uint32_t b = *(uint32_t*)&x +0x00001000;
+    union {
+        float f;
+        uint32_t u;
+    } bits = {.f = x};
+    const uint32_t b = bits.u + 0x00001000;
     const uint32_t e = (b&0x7F800000)>>23; // exponent
     const uint32_t m = b&0x007FFFFF; // mantissa
+    uint32_t denormalized = 0;
+
+    if (e > 101 && e < 113) {
+        denormalized = (((0x007FF000 + m) >> (125 - e)) + 1) >> 1;
+    }
+
     // 0x007FF000 = 0x00800000-0x00001000 = decimal indicator flag - initial rounding
     // sign | normalized | denormalized | saturate
-    return (b&0x80000000)>>16 | (e>112)*((((e-112)<<10)&0x7C00)|m>>13) | ((e<113)&(e>101))*((((0x007FF000+m)>>(125-e))+1)>>1) | (e>143)*0x7FFF;
+    return (b&0x80000000)>>16 | (e>112)*((((e-112)<<10)&0x7C00)|m>>13) | denormalized | (e>143)*0x7FFF;
+}
+
+float from_float16(uint16_t x) {
+    const float sign = x & 0x8000u ? -1.0f : 1.0f;
+    const uint16_t exponent = (x >> 10) & 0x1fu;
+    const uint16_t mantissa = x & 0x03ffu;
+    return sign * (exponent ? ldexpf(1024.0f + mantissa, exponent - 25)
+                            : ldexpf(mantissa, -24));
 }
 
 // clang-format on
-#pragma GCC diagnostic pop
 
 void buffer_append_int16(uint8_t *buffer, int16_t number, int32_t *index) {
     buffer[(*index)++] = number >> 8;
@@ -68,11 +88,30 @@ void buffer_append_uint32(uint8_t *buffer, uint32_t number, int32_t *index) {
 }
 
 void buffer_append_float16(uint8_t *buffer, float number, float scale, int32_t *index) {
-    buffer_append_int16(buffer, (int16_t) (number * scale), index);
+    float scaled = number * scale;
+    if (isnan(scaled)) {
+        scaled = 0.0f;
+    } else if (scaled > 32767.0f) {
+        scaled = 32767.0f;
+    } else if (scaled < -32768.0f) {
+        scaled = -32768.0f;
+    }
+    buffer_append_int16(buffer, (int16_t) scaled, index);
 }
 
 void buffer_append_float32(uint8_t *buffer, float number, float scale, int32_t *index) {
-    buffer_append_int32(buffer, (int32_t) (number * scale), index);
+    float scaled = number * scale;
+    if (isnan(scaled)) {
+        scaled = 0.0f;
+    }
+
+    if (scaled >= 2147483648.0f) {
+        buffer_append_int32(buffer, INT32_MAX, index);
+    } else if (scaled <= -2147483648.0f) {
+        buffer_append_int32(buffer, INT32_MIN, index);
+    } else {
+        buffer_append_int32(buffer, (int32_t) scaled, index);
+    }
 }
 
 /*
@@ -116,6 +155,10 @@ void buffer_append_float32(uint8_t *buffer, float number, float scale, int32_t *
  * floating point numbers in a fully defined manner.
  */
 void buffer_append_float32_auto(uint8_t *buffer, float number, int32_t *index) {
+    if (!isfinite(number)) {
+        number = 0.0f;
+    }
+
     // Set subnormal numbers to 0 as they are not handled properly
     // using this method.
     if (fabsf(number) < 1.5e-38) {

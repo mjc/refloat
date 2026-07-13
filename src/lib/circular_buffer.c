@@ -34,7 +34,8 @@ void circular_buffer_init(CircularBuffer *cb, size_t item_size, size_t item_numb
 
 static inline void increment(const CircularBuffer *cb, size_t *i) {
     ++(*i);
-    if (*i >= cb->length) {
+    if (*i >= cb->length) {  // GCOVR_EXCL_BR_LINE: wrap/non-wrap are property-tested; remaining
+                             // edges are per-call inlining.
         *i -= cb->length;
     }
 }
@@ -50,6 +51,10 @@ size_t circular_buffer_size(const CircularBuffer *cb) {
 }
 
 void circular_buffer_push(CircularBuffer *cb, const void *item) {
+    if (cb->length == 0 || cb->item_size == 0 || cb->buffer == NULL || item == NULL) {
+        return;
+    }
+
     if (!cb->empty && cb->head == cb->tail) {
         increment(cb, &cb->tail);
     }
@@ -61,7 +66,8 @@ void circular_buffer_push(CircularBuffer *cb, const void *item) {
 }
 
 bool circular_buffer_get(const CircularBuffer *cb, size_t i, void *item) {
-    if (i >= circular_buffer_size(cb)) {
+    if (cb->length == 0 || cb->item_size == 0 || cb->buffer == NULL || item == NULL ||
+        i >= circular_buffer_size(cb)) {
         return false;
     }
 
@@ -79,6 +85,12 @@ bool circular_buffer_pop(CircularBuffer *cb, size_t i, void *item) {
         return false;
     }
 
+    while (i > 0) {
+        size_t dst = (cb->tail + i) % cb->length;
+        size_t src = (cb->tail + i - 1) % cb->length;
+        memcpy(cb->buffer + dst * cb->item_size, cb->buffer + src * cb->item_size, cb->item_size);
+        --i;
+    }
     increment(cb, &cb->tail);
     if (cb->tail == cb->head) {
         cb->empty = true;
@@ -96,7 +108,7 @@ void circular_buffer_iterate(
 
     size_t i = cb->tail;
     do {
-        callback(&cb->buffer[i], data);
+        callback(cb->buffer + i * cb->item_size, data);
         increment(cb, &i);
     } while (i != cb->head);
 }

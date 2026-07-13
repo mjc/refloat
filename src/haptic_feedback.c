@@ -24,6 +24,12 @@
 #include <math.h>
 
 #define TONE_LENGTH 0.1f
+#define AUDIBLE_FREQUENCY_MIN 300.0f
+#define AUDIBLE_FREQUENCY_MAX 1000.0f
+#define AUDIBLE_STRENGTH_MAX 12.0f
+#define VIBRATE_FREQUENCY_MIN 10
+#define VIBRATE_FREQUENCY_MAX 200
+#define VIBRATE_STRENGTH_MAX 25.0f
 
 void haptic_feedback_init(HapticFeedback *hf) {
     hf->type_playing = HAPTIC_FEEDBACK_NONE;
@@ -34,13 +40,17 @@ void haptic_feedback_init(HapticFeedback *hf) {
 
 void haptic_feedback_configure(HapticFeedback *hf, const RefloatConfig *cfg) {
     hf->cfg = &cfg->haptic;
-    hf->duty_solid_threshold = cfg->tiltback_duty + hf->cfg->duty_solid_offset;
+    // Signed float16 custom configs can bypass both editors' zero minima.
+    hf->duty_solid_threshold =
+        clampf(cfg->tiltback_duty, 0.0f, 1.0f) + clampf(hf->cfg->duty_solid_offset, 0.0f, 1.0f);
 
     // pre-calculate the coefficients of the polynomial given the configured max strength speed
-    float m = hf->cfg->max_strength_speed > 0 ? hf->cfg->max_strength_speed : 1;
-    float a = hf->cfg->min_strength;
-    hf->str_poly_b = (1 - hf->cfg->strength_curvature) * (1 - a) / m;
-    hf->str_poly_c = (1 - a - hf->str_poly_b * m) / (m * m);
+    // vTx 1 can carry 0..255, wider than the editor's 10..100 km/h range.
+    float m = clampf(hf->cfg->max_strength_speed, 10.0f, 100.0f);
+    hf->min_strength = clampf(hf->cfg->min_strength, 0.0f, 1.0f);
+    float curvature = clampf(hf->cfg->strength_curvature, 0.0f, 1.0f);
+    hf->str_poly_b = (1 - curvature) * (1 - hf->min_strength) / m;
+    hf->str_poly_c = (1 - hf->min_strength - hf->str_poly_b * m) / (m * m);
 }
 
 static HapticFeedbackType haptic_feedback_get_type(
@@ -74,8 +84,8 @@ static HapticFeedbackType haptic_feedback_get_type(
         break;
     }
 
-    if (hf->cfg->current_threshold > 0.0f &&
-        motor_data_get_current_saturation(md) > hf->cfg->current_threshold) {
+    const float current_threshold = clampf(hf->cfg->current_threshold, 0.0f, 1.0f);
+    if (current_threshold > 0.0f && motor_data_get_current_saturation(md) > current_threshold) {
         return HAPTIC_FEEDBACK_DUTY_CONTINUOUS;
     }
 
@@ -86,7 +96,8 @@ static HapticFeedbackType haptic_feedback_get_type(
 // on even beats and if there are more than two beats, the last beat is
 // skipped, giving a certain number of "beeps" followed by a pause.
 static uint8_t get_beats(HapticFeedbackType type) {
-    switch (type) {
+    switch (type
+    ) {  // GCOVR_EXCL_BR_LINE: the caller excludes NONE; every playable type is covered.
     case HAPTIC_FEEDBACK_DUTY_SPEED:
         return 2;
     case HAPTIC_FEEDBACK_DUTY_CONTINUOUS:
@@ -101,11 +112,11 @@ static uint8_t get_beats(HapticFeedbackType type) {
         break;
     }
 
-    return 0;
+    return 0;  // GCOVR_EXCL_LINE: NONE is rejected by the caller; playable types return above.
 }
 
 static const CfgHapticTone *get_haptic_tone(const HapticFeedback *hf) {
-    switch (hf->type_playing) {
+    switch (hf->type_playing) {  // GCOVR_EXCL_BR_LINE: called only while a playable type is active.
     case HAPTIC_FEEDBACK_DUTY_SPEED:
     case HAPTIC_FEEDBACK_DUTY_CONTINUOUS:
         return &hf->cfg->duty;
@@ -121,11 +132,14 @@ static const CfgHapticTone *get_haptic_tone(const HapticFeedback *hf) {
 }
 
 static inline float strength_scale(const HapticFeedback *hf, float speed) {
-    return min(hf->cfg->min_strength + hf->str_poly_b * speed + hf->str_poly_c * speed * speed, 1);
+    return clampf(
+        hf->min_strength + hf->str_poly_b * speed + hf->str_poly_c * speed * speed, 0.0f, 1.0f
+    );
 }
 
 static inline void foc_play_tone(int channel, float freq, float voltage) {
-    if (!VESC_IF->foc_play_tone) {
+    if (!VESC_IF->foc_play_tone) {  // GCOVR_EXCL_BR_LINE: NULL and non-NULL are covered; gcov adds
+                                    // indirect-call edges.
         return;
     }
 
@@ -174,18 +188,28 @@ void haptic_feedback_update(
         hf->is_playing = false;
     } else if (should_be_playing) {
         const CfgHapticTone *tone = get_haptic_tone(hf);
-        if (tone->strength > 0.0f) {
+        const float scale = strength_scale(hf, fabsf(md->speed));
+        const float audible_strength = clampf(tone->strength, 0.0f, AUDIBLE_STRENGTH_MAX);
+        if (audible_strength > 0.0f) {
             foc_play_tone(
-                0, tone->frequency, tone->strength * strength_scale(hf, fabsf(md->speed))
+                0,
+                clampf(tone->frequency, AUDIBLE_FREQUENCY_MIN, AUDIBLE_FREQUENCY_MAX),
+                audible_strength * scale
             );
+        } else if (hf->is_playing) {
+            foc_play_tone(0, 1, 0.0f);
         }
 
-        if (hf->cfg->vibrate.strength > 0.0f) {
+        const float vibrate_strength =
+            clampf(hf->cfg->vibrate.strength, 0.0f, VIBRATE_STRENGTH_MAX);
+        if (vibrate_strength > 0.0f) {
             motor_control_play_tone(
                 mc,
-                hf->cfg->vibrate.frequency,
-                hf->cfg->vibrate.strength * strength_scale(hf, fabsf(md->speed))
+                min(max(hf->cfg->vibrate.frequency, VIBRATE_FREQUENCY_MIN), VIBRATE_FREQUENCY_MAX),
+                vibrate_strength * scale
             );
+        } else if (hf->is_playing) {
+            motor_control_stop_tone(mc);
         }
 
         hf->is_playing = true;

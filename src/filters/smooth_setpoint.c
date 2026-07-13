@@ -48,10 +48,17 @@ void smooth_setpoint_configure(
     float off_speed_down,
     float frequency
 ) {
-    st->on_speed_up = on_speed_up;
-    st->off_speed_up = off_speed_up;
-    st->on_speed_down = on_speed_down;
-    st->off_speed_down = off_speed_down;
+    st->on_speed_up = fmaxf(on_speed_up, 0.0f);
+    st->off_speed_up = fmaxf(off_speed_up, 0.0f);
+    st->on_speed_down = fmaxf(on_speed_down, 0.0f);
+    st->off_speed_down = fmaxf(off_speed_down, 0.0f);
+
+    // Raw custom-config packets preserve float16 values without enforcing the
+    // VESC Tool editors' 0.01..0.5 second filter range.
+    time_constant = clampf(time_constant, 0.01f, 0.5f);
+    on_speed_time_constant = clampf(on_speed_time_constant, 0.01f, 0.5f);
+    off_speed_time_constant = clampf(off_speed_time_constant, 0.01f, 0.5f);
+    winddown_time_constant = clampf(winddown_time_constant, 0.01f, 0.5f);
 
     // alpha is used in a 2nd order EMA filter, 2.146 is the multiplier for the
     // calculated first order EMA alpha to maintain the time constant
@@ -69,6 +76,10 @@ void smooth_setpoint_reset(SmoothSetpoint *st) {
 }
 
 void smooth_setpoint_update(SmoothSetpoint *st, float target, bool forward, float mult, float dt) {
+    if (!isfinite(target) || !isfinite(mult) || mult < 0.0f || dt <= 0.0f) {
+        return;
+    }
+
     if (st->is_winddown) {
         st->is_winddown = false;
         st->v1 = st->value;

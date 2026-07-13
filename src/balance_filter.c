@@ -31,6 +31,7 @@
 
 #include "balance_filter.h"
 
+#include "lib/utils.h"
 #include "vesc_c_if.h"
 
 #include <math.h>
@@ -62,15 +63,34 @@ void balance_filter_init(BalanceFilterData *data) {
 }
 
 void balance_filter_configure(BalanceFilterData *data, const RefloatConfig *config) {
-    data->kp_pitch = config->mahony_kp;
-    data->kp_roll = config->mahony_kp_roll;
+    // Unchecked custom configs can exceed the 0..3 Mahony domain over BTLE;
+    // bound pitch and roll before deriving yaw feedback from them.
+    data->kp_pitch = clampf(config->mahony_kp, 0.0f, 3.0f);
+    data->kp_roll = clampf(config->mahony_kp_roll, 0.0f, 3.0f);
     // Use middle value between Pitch KP and Roll KP. Yaw KP seems to have
     // negligible effect on balancing and the middle value should skew the
     // filter the least.
-    data->kp_yaw = (config->mahony_kp + config->mahony_kp_roll) / 2.0f;
+    data->kp_yaw = (data->kp_pitch + data->kp_roll) / 2.0f;
 }
 
 void balance_filter_update(BalanceFilterData *data, float *gyro_xyz, float *accel_xyz, float dt) {
+    if (dt <= 0.0f) {
+        return;
+    }
+
+    for (size_t i = 0; i < 3; ++i) {
+        if (!isfinite(gyro_xyz[i]) || !isfinite(accel_xyz[i])) {
+            return;
+        }
+    }
+
+    if (!isfinite(data->q0) || !isfinite(data->q1) || !isfinite(data->q2) || !isfinite(data->q3)) {
+        data->q0 = 1.0f;
+        data->q1 = 0.0f;
+        data->q2 = 0.0f;
+        data->q3 = 0.0f;
+    }
+
     float gx = gyro_xyz[0];
     float gy = gyro_xyz[1];
     float gz = gyro_xyz[2];

@@ -122,6 +122,7 @@ typedef struct {
 
     // Feature: Flywheel
     bool flywheel_abort;
+    bool flywheel_allow_abort;
 
     // Feature: Soft Start
     float softstart_pid_limit;

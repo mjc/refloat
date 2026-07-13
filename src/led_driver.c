@@ -176,8 +176,7 @@ inline static uint8_t color_order_bits(LedColorOrder order) {
         return 24;
     }
 
-    // the switch above should be exhaustive, just silence the warning
-    return 24;
+    return 0;
 }
 
 void led_driver_init(LedDriver *driver) {
@@ -192,6 +191,15 @@ bool led_driver_setup(
         log_error("Invalid LED pin configured: %u", pin);
         return false;
     }
+
+    for (size_t i = 0; i < STRIP_COUNT; ++i) {
+        const LedStrip *strip = led_strips[i];
+        if (strip && color_order_bits(strip->color_order) == 0) {
+            log_error("Invalid LED strip configuration.");
+            return false;
+        }
+    }
+
     driver->pin_hw_config = &pin_hw_configs[pin];
 
     driver->bitbuffer_length = 0;
@@ -241,20 +249,20 @@ inline static uint8_t cgamma(uint8_t c) {
 
 static uint32_t color_grb(uint8_t w, uint8_t r, uint8_t g, uint8_t b) {
     unused(w);
-    return (g << 16) | (r << 8) | b;
+    return ((uint32_t) g << 16) | ((uint32_t) r << 8) | b;
 }
 
 static uint32_t color_grbw(uint8_t w, uint8_t r, uint8_t g, uint8_t b) {
-    return (g << 24) | (r << 16) | (b << 8) | w;
+    return ((uint32_t) g << 24) | ((uint32_t) r << 16) | ((uint32_t) b << 8) | w;
 }
 
 static uint32_t color_rgb(uint8_t w, uint8_t r, uint8_t g, uint8_t b) {
     unused(w);
-    return (r << 16) | (g << 8) | b;
+    return ((uint32_t) r << 16) | ((uint32_t) g << 8) | b;
 }
 
 static uint32_t color_wrgb(uint8_t w, uint8_t r, uint8_t g, uint8_t b) {
-    return (w << 24) | (r << 16) | (g << 8) | b;
+    return ((uint32_t) w << 24) | ((uint32_t) r << 16) | ((uint32_t) g << 8) | b;
 }
 
 void led_driver_paint(LedDriver *driver) {
@@ -269,7 +277,8 @@ void led_driver_paint(LedDriver *driver) {
         }
 
         uint32_t (*color_conv)(uint8_t, uint8_t, uint8_t, uint8_t);
-        switch (strip->color_order) {
+        switch (strip->color_order
+        ) {  // GCOVR_EXCL_BR_LINE: setup rejects the default; all valid orders are covered.
         case LED_COLOR_GRB:
             color_conv = color_grb;
             break;
@@ -282,6 +291,8 @@ void led_driver_paint(LedDriver *driver) {
         case LED_COLOR_WRGB:
             color_conv = color_wrgb;
             break;
+        default:
+            return;
         }
 
         uint8_t bits = color_order_bits(strip->color_order);

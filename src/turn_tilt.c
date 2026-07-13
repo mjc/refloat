@@ -30,7 +30,7 @@ void turn_tilt_init(TurnTilt *tt) {
 }
 
 void turn_tilt_reset(TurnTilt *tt) {
-    tt->last_yaw_angle = 0.0f;
+    tt->last_yaw_angle = NAN;
     ema_reset(&tt->yaw_change, 0.0f);
     tt->yaw_aggregate = 0.0f;
 
@@ -41,8 +41,9 @@ void turn_tilt_reset(TurnTilt *tt) {
 void turn_tilt_configure(TurnTilt *tt, const RefloatConfig *config, float frequency) {
     ema_configure(&tt->yaw_change, 25.0f, frequency);
 
-    tt->boost_per_erpm =
-        (float) config->turntilt_erpm_boost / 100.0 / config->turntilt_erpm_boost_end;
+    // vTx 3 accepts 65535, while the supported turn-tilt boost is 0..10000%.
+    const uint16_t erpm_boost = min(config->turntilt_erpm_boost, 10000u);
+    tt->boost_per_erpm = (float) erpm_boost / 100.0 / fmaxf(config->turntilt_erpm_boost_end, 1.0f);
 
     float speed_time_constant = config->turn_tilt.filter.time_constant * 0.5f;
     smooth_setpoint_configure(
@@ -60,6 +61,15 @@ void turn_tilt_configure(TurnTilt *tt, const RefloatConfig *config, float freque
 }
 
 void turn_tilt_aggregate(TurnTilt *tt, const IMU *imu, float dt) {
+    if (!isfinite(imu->yaw) || dt <= 0.0f) {
+        return;
+    }
+
+    if (!isfinite(tt->last_yaw_angle)) {
+        tt->last_yaw_angle = imu->yaw;
+        return;
+    }
+
     float new_change = imu->yaw - tt->last_yaw_angle;
     if (new_change < -180.0f) {
         new_change += 360.0f;
@@ -86,33 +96,38 @@ void turn_tilt_aggregate(TurnTilt *tt, const IMU *imu, float dt) {
 void turn_tilt_update(
     TurnTilt *tt, const MotorData *md, const RefloatConfig *config, bool wheelslip, float dt
 ) {
-    if (config->turntilt_strength == 0) {
-        return;
-    }
-
     if (wheelslip) {
         smooth_setpoint_winddown(&tt->setpoint);
         return;
     }
 
+    // Custom config packets bypass the VESC Tool UI's field bounds.
+    float angle_limit = clampf(config->turntilt_angle_limit, 0.0f, 30.0f);
+    float strength = clampf(config->turntilt_strength, -30.0f, 30.0f);
+    float start_angle = clampf(config->turntilt_start_angle, 0.0f, 45.0f);
+    // vTx 3 accepts zero even though the editor's minimum is 100 ERPM.
+    uint16_t start_erpm = max(config->turntilt_start_erpm, 100u);
+    // vTx 1 can encode values below the editor's 50-degree aggregate minimum.
+    float yaw_aggregate = clampf(config->turntilt_yaw_aggregate, 50.0f, 255.0f);
     float abs_yaw_change = fabsf(tt->yaw_change.value);
     float abs_yaw_aggregate = fabsf(tt->yaw_aggregate);
 
     // Minimum threshold based on
     // a) minimum degrees per second (yaw/turn increment)
     // b) minimum yaw aggregate (to filter out wiggling on uneven road)
-    if (abs_yaw_aggregate < config->turntilt_start_angle || abs_yaw_change < 30.0f) {
+    if (abs_yaw_aggregate < start_angle || abs_yaw_change < 30.0f) {
         tt->target = 0;
     } else {
         // Calculate desired angle
-        tt->target = abs_yaw_change * LOOP_HERTZ_COMPAT_RECIP * config->turntilt_strength;
+        tt->target = abs_yaw_change * LOOP_HERTZ_COMPAT_RECIP * strength;
 
         // Apply speed scaling
         float boost;
         if (md->abs_erpm < config->turntilt_erpm_boost_end) {
             boost = 1.0 + md->abs_erpm * tt->boost_per_erpm;
         } else {
-            boost = 1.0 + (float) config->turntilt_erpm_boost / 100.0;
+            // Keep the post-ramp path under the same BTLE-reachable bound.
+            boost = 1.0 + (float) min(config->turntilt_erpm_boost, 10000u) / 100.0;
         }
         tt->target *= boost;
 
@@ -121,15 +136,14 @@ void turn_tilt_update(
         if (md->abs_erpm < 2000) {
             aggregate_damper = 0.5;
         }
-        boost = 1 + aggregate_damper * abs_yaw_aggregate / config->turntilt_yaw_aggregate;
+        boost = 1 + aggregate_damper * abs_yaw_aggregate / yaw_aggregate;
         boost = fminf(boost, 2);
         tt->target *= boost;
 
-        tt->target =
-            clampf(tt->target, -config->turntilt_angle_limit, config->turntilt_angle_limit);
+        tt->target = clampf(tt->target, -angle_limit, angle_limit);
 
         // Disable below erpm threshold otherwise add directionality
-        if (md->abs_erpm < config->turntilt_start_erpm) {
+        if (md->abs_erpm < start_erpm) {
             tt->target = 0;
         } else {
             tt->target *= md->erpm_sign;

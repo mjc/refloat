@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <math.h>
+
 /** Exponential Moving Average
  */
 typedef struct {
@@ -35,5 +37,8 @@ void ema_configure(EMA *ema, float cutoff_freq, float update_freq);
 void ema_reset(EMA *ema, float value);
 
 inline void ema_update(EMA *ema, float target) {
+    if (!isfinite(target)) {
+        return;
+    }
     ema->value += ema->alpha * (target - ema->value);
 }

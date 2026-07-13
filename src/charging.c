@@ -17,7 +17,10 @@
 
 #include "charging.h"
 
+#include <math.h>
+
 #include "conf/buffer.h"
+#include "time.h"
 
 #include "vesc_c_if.h"
 
@@ -29,8 +32,10 @@ void charging_init(Charging *charging) {
 
 void charging_timeout(Charging *charging, State *state) {
     // Timeout the charging state after 5 seconds if the charging module didn't update
-    if (VESC_IF->system_time() - charging->timer > 5.0f) {
+    if (system_time_age(VESC_IF->system_time(), charging->timer) > 5.0f) {
         state->charging = false;
+        charging->voltage = 0.0f;
+        charging->current = 0.0f;
     }
 }
 
@@ -50,14 +55,27 @@ void charging_state_request(Charging *charging, uint8_t *buffer, size_t len, Sta
         return;
     }
 
-    state->charging = buffer[idx++] > 0;
-    charging->timer = VESC_IF->system_time();
-
-    if (state->charging) {
-        charging->voltage = buffer_get_float16(buffer, 10, &idx);
-        charging->current = buffer_get_float16(buffer, 10, &idx);
-    } else {
+    bool charging_requested = buffer[idx++] > 0;
+    if (charging_requested && (state->state == STATE_RUNNING || state->mode != MODE_NORMAL)) {
+        return;
+    }
+    if (!charging_requested) {
+        state->charging = false;
+        charging->timer = VESC_IF->system_time();
         charging->voltage = 0;
         charging->current = 0;
+        return;
     }
+
+    float voltage = buffer_get_float16(buffer, 10, &idx);
+    float current = buffer_get_float16(buffer, 10, &idx);
+    // Both values come from signed 16-bit fixed-point protocol fields.
+    if (voltage <= 0.0f || current <= 0.0f) {
+        return;
+    }
+
+    state->charging = true;
+    charging->timer = VESC_IF->system_time();
+    charging->voltage = voltage;
+    charging->current = current;
 }

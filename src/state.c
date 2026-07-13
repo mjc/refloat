@@ -49,7 +49,7 @@ void state_flywheel_off(State *state) {
 void state_set_disabled(State *state, bool disabled) {
     if (state->state != STATE_RUNNING && disabled) {
         state->state = STATE_DISABLED;
-    } else if (state->state == STATE_DISABLED && !disabled) {
+    } else if (state->state == STATE_DISABLED) {
         state->state = STATE_STARTUP;
     }
 }
