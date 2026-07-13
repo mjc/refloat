@@ -13,26 +13,35 @@ Contributions are welcome and appreciated, please refer to [Contributing](CONTRI
 ## Building
 ### Requirements
 - `gcc-arm-embedded` version 13 or higher
-- `make`
+- `cmake`
+- `ninja`
 - `vesc_tool`
 
 To build the package, run:
 ```sh
-make
+cmake --workflow --preset package
 ```
 
-Note a new beta (as of writing this, unreleased) version of `vesc_tool` is needed for the above to work. To build the package with the current / old `vesc_tool` version, use:
+This builds `build/package/artifacts/refloat.vescpkg` and checks the package
+payload against the VESC package limits.
+
+To run the host test gate without building the package, use:
 ```sh
-make OLDVT=1
+cmake --workflow --preset host
+```
+
+To build only the package artifact, use:
+```sh
+cmake --build --preset package
 ```
 
 If you don't have `vesc_tool` in your `$PATH` (but you have, for example, a downloaded `vesc_tool` binary), you can specify the `vesc_tool` to use:
 ```sh
-make VESC_TOOL=/path/to/vesc_tool
+cmake --preset package -DREFLOAT_VESC_TOOL_EXECUTABLE=/path/to/vesc_tool
 ```
 For macOS, the path to VESC Tool when installed using the official installer is as follows:
 ```sh
-make VESC_TOOL="/Applications/VESC Tool.app/Contents/MacOS/VESC Tool"
+cmake --preset package -DREFLOAT_VESC_TOOL_EXECUTABLE="/Applications/VESC Tool.app/Contents/MacOS/VESC Tool"
 ```
 
 ## Documentation
