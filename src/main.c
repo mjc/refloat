@@ -2645,6 +2645,12 @@ static int get_cfg_xml(uint8_t **buffer) {
     return DATA_REFLOATCONFIG__SIZE;
 }
 
+static void destroy_data(Data *d) {
+    motor_data_destroy(&d->motor);
+    leds_destroy(&d->leds);
+    VESC_IF->free(d);
+}
+
 // Called when code is stopped
 static void stop(void *arg) {
     Data *d = (Data *) arg;
@@ -2658,9 +2664,7 @@ static void stop(void *arg) {
         VESC_IF->request_terminate(d->main_thread);
     }
     log_msg("Terminating.");
-    motor_data_destroy(&d->motor);
-    leds_destroy(&d->leds);
-    VESC_IF->free(d);
+    destroy_data(d);
 }
 
 INIT_FUN(lib_info *info) {
@@ -2690,6 +2694,9 @@ INIT_FUN(lib_info *info) {
     d->main_thread = VESC_IF->spawn(refloat_thd, 1536, "Refloat Main", d);
     if (!d->main_thread) {
         log_error("Failed to spawn Refloat Main thread.");
+        destroy_data(d);
+        info->arg = NULL;
+        info->stop_fun = NULL;
         return false;
     }
 
@@ -2697,6 +2704,9 @@ INIT_FUN(lib_info *info) {
     if (!d->aux_thread) {
         log_error("Failed to spawn Refloat Auxiliary thread.");
         VESC_IF->request_terminate(d->main_thread);
+        destroy_data(d);
+        info->arg = NULL;
+        info->stop_fun = NULL;
         return false;
     }
 
