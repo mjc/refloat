@@ -131,10 +131,10 @@ void data_recorder_sample(DataRecord *dr, const Data *d, time_t time) {
 }
 
 static void send_point_vt_experiment(const void *item, void *data) {
-    unused(data);
+    const time_t start_time = *(const time_t *) data;
 
-    Sample *sample = (Sample *) item;
-    const float time = sample->time * (1.0f / SYSTEM_TICK_RATE_HZ);
+    const Sample *sample = (const Sample *) item;
+    const float time = (sample->time - start_time) * (1.0f / SYSTEM_TICK_RATE_HZ);
     for (uint8_t i = 0; i < ITEMS_COUNT_REC(RT_DATA_ALL_ITEMS); ++i) {
         VESC_IF->plot_set_graph(i);
         VESC_IF->plot_send_points(time, from_float16(sample->values[i]));
@@ -152,7 +152,9 @@ void data_recorder_send_experiment_plot(DataRecord *dr) {
     VISIT_REC(RT_DATA_ALL_ITEMS, ADD_GRAPH);
 #undef ADD_GRAPH
 
-    circular_buffer_iterate(&dr->buffer, &send_point_vt_experiment, 0);
+    Sample first_sample = {0};
+    circular_buffer_get(&dr->buffer, 0, &first_sample);
+    circular_buffer_iterate(&dr->buffer, &send_point_vt_experiment, &first_sample.time);
 }
 
 typedef enum {
