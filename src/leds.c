@@ -836,7 +836,18 @@ void leds_init(Leds *leds) {
     led_driver_init(&leds->led_driver);
 }
 
+static bool configure_strip(LedStrip *strip, const CfgLedStrip *cfg, const char *name) {
+    if (led_strip_configure(strip, cfg)) {
+        return true;
+    }
+
+    log_error("Invalid %s LED color order: %u.", name, cfg->color_order);
+    return false;
+}
+
 void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg) {
+    leds->cfg = cfg;
+
     uint8_t status_offset = 0;
     uint8_t front_offset = 0;
     uint8_t rear_offset = 0;
@@ -846,17 +857,23 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg) {
     size_t strip_i = 0;
     for (uint8_t i = 1; i <= STRIP_COUNT; ++i) {
         if (hw_cfg->status.order == i && hw_cfg->status.count > 0) {
-            led_strip_configure(&leds->status_strip, &hw_cfg->status);
+            if (!configure_strip(&leds->status_strip, &hw_cfg->status, "status")) {
+                return;
+            }
             status_offset = current_offset;
             current_offset += leds->status_strip.length;
             strip_array[strip_i++] = &leds->status_strip;
         } else if (hw_cfg->front.order == i && hw_cfg->front.count > 0) {
-            led_strip_configure(&leds->front_strip, &hw_cfg->front);
+            if (!configure_strip(&leds->front_strip, &hw_cfg->front, "front")) {
+                return;
+            }
             front_offset = current_offset;
             current_offset += leds->front_strip.length;
             strip_array[strip_i++] = &leds->front_strip;
         } else if (hw_cfg->rear.order == i && hw_cfg->rear.count > 0) {
-            led_strip_configure(&leds->rear_strip, &hw_cfg->rear);
+            if (!configure_strip(&leds->rear_strip, &hw_cfg->rear, "rear")) {
+                return;
+            }
             rear_offset = current_offset;
             current_offset += leds->rear_strip.length;
             strip_array[strip_i++] = &leds->rear_strip;
@@ -888,8 +905,6 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg) {
     }
     leds->front_strip.brightness = cfg->front.brightness;
     leds->rear_strip.brightness = cfg->rear.brightness;
-
-    leds->cfg = cfg;
 
     leds->front_bar = &cfg->front;
     leds->front_dir_target = &cfg->front;

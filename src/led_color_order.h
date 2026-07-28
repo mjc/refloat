@@ -1,4 +1,4 @@
-// Copyright 2025 Lukas Hrazky
+// Copyright 2026 Michael Conrad
 //
 // This file is part of the Refloat VESC package.
 //
@@ -15,27 +15,13 @@
 // You should have received a copy of the GNU General Public License along with
 // this program. If not, see <http://www.gnu.org/licenses/>.
 
-#include "led_strip.h"
+#pragma once
 
-#include <string.h>
+#include "conf/datatypes.h"
 
-void led_strip_init(LedStrip *strip) {
-    strip->data = NULL;
-    strip->length = 0;
-    led_color_order_resolve(LED_COLOR_GRB, &strip->color_bits, &strip->color_conv);
-    strip->reverse = false;
-}
+#include <stdbool.h>
+#include <stdint.h>
 
-bool led_strip_configure(LedStrip *strip, const CfgLedStrip *cfg) {
-    uint8_t color_bits;
-    LedColorConverter color_conv;
-    if (!led_color_order_resolve(cfg->color_order, &color_bits, &color_conv)) {
-        return false;
-    }
+typedef uint32_t (*LedColorConverter)(uint8_t w, uint8_t r, uint8_t g, uint8_t b);
 
-    strip->length = cfg->count;
-    strip->color_bits = color_bits;
-    strip->color_conv = color_conv;
-    strip->reverse = cfg->reverse;
-    return true;
-}
+bool led_color_order_resolve(LedColorOrder order, uint8_t *bits, LedColorConverter *converter);

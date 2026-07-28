@@ -17,8 +17,9 @@
 
 #pragma once
 
-#include "conf/datatypes.h"
+#include "led_color_order.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #define STRIP_COUNT 3
@@ -35,7 +36,8 @@ typedef union {
 typedef struct {
     uint32_t *data;
     uint8_t length;
-    LedColorOrder color_order;
+    uint8_t color_bits;
+    LedColorConverter color_conv;
     bool reverse;
     float brightness;
     TransitionData trans_data;
@@ -43,4 +45,4 @@ typedef struct {
 
 void led_strip_init(LedStrip *strip);
 
-void led_strip_configure(LedStrip *strip, const CfgLedStrip *cfg);
+bool led_strip_configure(LedStrip *strip, const CfgLedStrip *cfg);

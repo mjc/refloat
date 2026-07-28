@@ -166,20 +166,6 @@ static void deinit_hw(const PinHwConfig *cfg) {
     disable_dma_stream(cfg);
 }
 
-inline static uint8_t color_order_bits(LedColorOrder order) {
-    switch (order) {
-    case LED_COLOR_GRBW:
-    case LED_COLOR_WRGB:
-        return 32;
-    case LED_COLOR_GRB:
-    case LED_COLOR_RGB:
-        return 24;
-    }
-
-    // the switch above should be exhaustive, just silence the warning
-    return 24;
-}
-
 void led_driver_init(LedDriver *driver) {
     driver->bitbuffer_length = 0;
     driver->bitbuffer = NULL;
@@ -192,6 +178,7 @@ bool led_driver_setup(
         log_error("Invalid LED pin configured: %u", pin);
         return false;
     }
+
     driver->pin_hw_config = &pin_hw_configs[pin];
 
     driver->bitbuffer_length = 0;
@@ -207,7 +194,7 @@ bool led_driver_setup(
 
         driver->strips[i] = strip;
         offsets[i] = driver->bitbuffer_length;
-        driver->bitbuffer_length += color_order_bits(strip->color_order) * strip->length;
+        driver->bitbuffer_length += strip->color_bits * strip->length;
     }
 
     // An extra array item to set the output to 0 PWM
@@ -239,24 +226,6 @@ inline static uint8_t cgamma(uint8_t c) {
     return (c * c + c) / 256;
 }
 
-static uint32_t color_grb(uint8_t w, uint8_t r, uint8_t g, uint8_t b) {
-    unused(w);
-    return ((uint32_t) g << 16) | ((uint32_t) r << 8) | b;
-}
-
-static uint32_t color_grbw(uint8_t w, uint8_t r, uint8_t g, uint8_t b) {
-    return ((uint32_t) g << 24) | ((uint32_t) r << 16) | ((uint32_t) b << 8) | w;
-}
-
-static uint32_t color_rgb(uint8_t w, uint8_t r, uint8_t g, uint8_t b) {
-    unused(w);
-    return ((uint32_t) r << 16) | ((uint32_t) g << 8) | b;
-}
-
-static uint32_t color_wrgb(uint8_t w, uint8_t r, uint8_t g, uint8_t b) {
-    return ((uint32_t) w << 24) | ((uint32_t) r << 16) | ((uint32_t) g << 8) | b;
-}
-
 void led_driver_paint(LedDriver *driver) {
     if (!driver->bitbuffer) {
         return;
@@ -268,23 +237,6 @@ void led_driver_paint(LedDriver *driver) {
             break;
         }
 
-        uint32_t (*color_conv)(uint8_t, uint8_t, uint8_t, uint8_t);
-        switch (strip->color_order) {
-        case LED_COLOR_GRB:
-            color_conv = color_grb;
-            break;
-        case LED_COLOR_GRBW:
-            color_conv = color_grbw;
-            break;
-        case LED_COLOR_RGB:
-            color_conv = color_rgb;
-            break;
-        case LED_COLOR_WRGB:
-            color_conv = color_wrgb;
-            break;
-        }
-
-        uint8_t bits = color_order_bits(strip->color_order);
         uint16_t *strip_bitbuffer = driver->strip_bitbuffs[i];
 
         for (uint32_t j = 0; j < strip->length; ++j) {
@@ -294,10 +246,11 @@ void led_driver_paint(LedDriver *driver) {
             uint8_t g = cgamma((color >> 8) & 0xFF);
             uint8_t b = cgamma(color & 0xFF);
 
-            color = color_conv(w, r, g, b);
+            color = strip->color_conv(w, r, g, b);
 
-            for (int8_t bit = bits - 1; bit >= 0; --bit) {
-                strip_bitbuffer[bit + j * bits] = color & 0x1 ? WS2812_ONE : WS2812_ZERO;
+            for (int8_t bit = strip->color_bits - 1; bit >= 0; --bit) {
+                strip_bitbuffer[bit + j * strip->color_bits] =
+                    color & 0x1 ? WS2812_ONE : WS2812_ZERO;
                 color >>= 1;
             }
         }
