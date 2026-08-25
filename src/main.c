@@ -398,7 +398,7 @@ static bool check_faults(Data *d) {
                 return true;
             }
 
-            if (reverse_stop_stop(&d->reverse_stop, &d->time)) {
+            if (reverse_stop_stop(&d->reverse_stop, d->imu.pitch, &d->time)) {
                 state_stop(&d->state, STOP_REVERSE_STOP);
                 return true;
             }
@@ -937,6 +937,19 @@ static void refloat_thd(void *arg) {
 
             break;
         case (STATE_READY):
+            if (d->state.stop_condition == STOP_REVERSE_STOP && !d->state.darkride) {
+                if (d->footpad.state != FS_NONE) {
+                    timer_refresh(&d->time, &d->fault_switch_timer);
+                    break;
+                }
+                if (!timer_older_ms(
+                        &d->time, d->fault_switch_timer, d->float_conf.fault_delay_switch_full
+                    )) {
+                    break;
+                }
+                d->state.stop_condition = STOP_NONE;
+            }
+
             if (d->state.mode == MODE_FLYWHEEL) {
                 if (d->flywheel_abort || d->footpad.state != FS_NONE) {
                     flywheel_stop(d);

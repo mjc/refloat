@@ -31,6 +31,7 @@ typedef struct {
     EMA progress;
 
     time_t timer;
+    time_t pitch_timer;
 } ReverseStop;
 
 void reverse_stop_init(ReverseStop *rs);
@@ -47,4 +48,4 @@ float reverse_stop_setpoint(ReverseStop *rs);
 
 bool reverse_stop_active(ReverseStop *rs);
 
-bool reverse_stop_stop(ReverseStop *rs, const Time *time);
+bool reverse_stop_stop(ReverseStop *rs, float pitch, const Time *time);
