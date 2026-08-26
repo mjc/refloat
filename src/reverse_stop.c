@@ -43,6 +43,7 @@ void reverse_stop_reset(ReverseStop *rs, float distance) {
     rs->current_distance = 0.0f;
     rs->target_distance = 0.0f;
     ema_reset(&rs->progress, 1.0f);
+    rs->pitch_timer = 0;
 }
 
 void reverse_stop_configure(ReverseStop *rs, float frequency) {
@@ -70,6 +71,7 @@ void reverse_stop_update(
         // a reverse stop from a negative setpoint and then start going back out of it
         if (rs->target_setpoint > 0.0f) {
             rs->target_distance *= -1;
+            timer_refresh(time, &rs->pitch_timer);
         }
 
         float new_progress = 0.0f;
@@ -115,7 +117,23 @@ bool reverse_stop_active(ReverseStop *rs) {
     return rs->target_setpoint > 0.0f || rs->progress.value < 1.0f;
 }
 
-bool reverse_stop_stop(ReverseStop *rs, const Time *time) {
+bool reverse_stop_stop(ReverseStop *rs, float pitch, const Time *time) {
+    if (rs->target_setpoint > 0.0f) {
+        float abs_pitch = fabsf(pitch);
+        if (abs_pitch > 18.0f) {
+            return true;
+        }
+        if (abs_pitch > 10.0f && timer_older(time, rs->pitch_timer, 1.0f)) {
+            return true;
+        }
+        if (abs_pitch > 5.0f && timer_older(time, rs->pitch_timer, 2.0f)) {
+            return true;
+        }
+        if (abs_pitch <= 5.0f) {
+            timer_refresh(time, &rs->pitch_timer);
+        }
+    }
+
     float progress = rs->progress.value;
 
     // the timer only starts aging below a certain setpoint angle threshold
@@ -125,5 +143,6 @@ bool reverse_stop_stop(ReverseStop *rs, const Time *time) {
         return true;
     }
 
-    return rs->target_setpoint > 0.0f && progress >= 1.0f;
+    return rs->target_setpoint > 0.0f &&
+        (progress >= 1.0f || rs->current_distance <= rs->target_distance);
 }
